@@ -1,0 +1,26 @@
+**== Version v1.1.0==**
+- [Apr/06/2021] - Rebranded
+**== Version v1.0.10A==**
+- [Apr/04/2021] - Added cat and dog image command
+**== Version v1.0.10==**
+- [Mar/26/2021] - Flirt command now works via Slash Commands
+- [Mar/26/2021] - Added several Slash commands
+**== Version v1.0.9A==**
+- [Mar/25/2021] - Made modules reloadable even if modules crash
+- [Mar/25/2021] - Ignore webhooks
+- [Mar/25/2021] - Permissions management
+**== Version v1.0.9==**
+- [Mar/22/2021] - Embeds are cool! More embeds everywhere
+- [Mar/21/2021] - Continued rollout of Dynamic argument parsing
+- [Mar/21/2021] - Users are now ignorable
+**== Version v1.0.8 ==**
+- [Mar/20/2021] - Changelog is now publicly accessible
+- [Mar/19/2021] - Ban and Unban commands are now functional
+**== Version v1.0.7 ==**
+- [Mar/16/2021] - External User ID Search command added
+- [Mar/15/2021] - Avatar command added
+
+**== Upcoming ==**
+- More intuitive Settings management system
+- Converting rest of the commands to the argument system
+- Consolidation of certain events into functions
