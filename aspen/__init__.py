@@ -64,6 +64,7 @@ async def ignoreUser(id, guild, state):
         jsonFile = open("settings.json", "w+")
         json.dump(settings, jsonFile, indent=4, )
         jsonFile.close()
+
 async def getChannel(client, message, type):
     f = open("settings.json")
     settings = Dict(json.load(f))
@@ -71,5 +72,34 @@ async def getChannel(client, message, type):
     channel = client.get_channel(int(channelid))
     return channel
 
+async def isOwner(message):
+    return
 
+async def isAdmin(message):
+    return
 
+async def isMod(message):
+    return
+
+async def userArgParse(message, selector):
+    text = message.content.split()
+    replacer = text[0]
+    if message.content.replace(replacer, "", 1) == "":
+        target = message.author.id
+    elif message.content.replace(replacer+" ", "", 1) == text[1]:
+        if text[selector].startswith('<@!') or text[selector].startswith('<@'):
+            target = text[selector].replace("<@", "", 1)
+            target = target.replace("!", "", 1)
+            target = target.replace(">", "", 1)
+        else:
+            try:
+                target = int(text[selector])
+            except:
+                await message.channel.send("Please ensure you used a User ID, or valid user mention.")
+                return None
+    try:
+        target = await message.guild.fetch_member(target)
+    except:
+        await message.channel.send("Could not find user!")
+        return None
+    return target

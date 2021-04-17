@@ -1,12 +1,9 @@
 import discord
 import subprocess
 import requests
-import random
 from discord.ext import commands
 import random
 import os
-from dotenv import load_dotenv
-#from datetime
 from datetime import datetime
 import sys
 import asyncio
@@ -18,71 +15,96 @@ from addict import Dict
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.utils.manage_commands import create_option, create_choice
 import aioconsole
+
+# variables used throughout operations
 startTime = datetime.now()
-softmute = []
+softmute = []  # userids in softmute get all of their messages deleted as soon as the bot is able to do so
 sniper = {}
 f = open("settings.json")
 Intents = discord.Intents.default()
 Intents.members = True
 client = commands.AutoShardedBot(command_prefix="$", intents=Intents, shard_count=3, shard_ids=[0, 1, 2])
 slash = SlashCommand(client, sync_commands=True)
-settings = {}
+settings = {}  # placeholder dict for settings in event of loading failure
 try:
-    settings = Dict(json.load(f))
+    settings = Dict(json.load(f))  # loads guild specific settings
     f.close()
 except:
     print("An error occurred while loading settings")
 
-f = open("banned_words.json")
+f = open("banned_words.json")  # banned words is currently a global filter, although will become a guild specific list soon
 botConfig = Dict(json.load(open("config.json")))
 chatFilter = Dict(json.load(f))
+embedColour = discord.Colour.from_rgb(255,0,242)
 
 @client.event
-async def on_ready():
+async def on_ready():  # run when all of the shards have logged in and connected
     print('We have logged in as {0.user}'.format(client))
     await client.change_presence(activity=discord.Activity(type=discord.ActivityType.listening,name="APIs"))
-    client.loop.create_task(backgroundTask())
+    client.loop.create_task(backgroundTask())  # fires the command line console input
 
 @client.event
-async def on_member_join(member):
+async def on_member_join(member):  #  runs when a new user joins any guild that the bot is in
     if member.bot:
         return
     if member.guild.id == 806151212814565386:
         channel = client.get_channel(825096484180983868)
         await channel.send(member.mention+" Welcome to Subway! You can get roles from <#806156381933273108>, <#819280783067316224>, and <#823398921581101056>")
     return
+
+
 @client.event
-async def on_message_edit(before, after):
-    if after.author == client.user:
+async def on_message_edit(before, after):   # run whenever a message is edited
+    if after.author == client.user:  # if the edited message is done by this bot, the message is deleted
         return
-    if "discord.gg/" in after.content:
+    if "discord.gg/" in after.content:  # need to add a guild setting check, which will allow guild admins to disable
         if not after.author.guild_permissions.manage_messages:
             await after.delete()
-    if after.author.id == 750835145556230206:
-        if after.content == "This is a legal message to confirm to the public that may find my previous messages that may contain the words “simp”, or may indicate that I could be a simp, that I am not in fact a simp. Everything I say is for jokes and jokes only, therefore I am not a simp in any way, shape or form. Also to note, I am presently not dating anyone online. Anything I say that could possibly indicate that I am dating someone presently is to be automatically invalidated, and is used for jokes and jokes only.":
-            await after.delete()
-    for key in chatFilter['bannedWords']:
+    for key in chatFilter['bannedWords']:  # checks for banned words as editing messages could be used as a bypass
         text = after.content.lower()
         if key in text.split() and after.author.id != 193112730943750144:
             await after.delete()
-            embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`", colour=discord.Colour.from_rgb(255, 0, 242))
+            embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match`", colour=discord.Colour.from_rgb(255, 0, 242))
             embed.add_field(name="Banned Word", value=key)
             embed.add_field(name="Full Message", value=after.content, inline=False)
             embed.set_author(name=after.author.name+'#'+after.author.discriminator, icon_url=after.author.avatar_url)
             channel = client.get_channel(int(settings[str(after.guild.id)]["Channels"]["Logging"]))
             await channel.send(embed=embed)
+    for key in chatFilter['wildcardWords']:  # checks for banned words as editing messages could be used as a bypass
+        if x in after.content.lower():
+            await after.delete()
+            embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`",
+                                  colour=discord.Colour.from_rgb(255, 0, 242))
+            embed.add_field(name="Banned Word", value=key)
+            embed.add_field(name="Full Message", value=after.content, inline=False)
+            embed.set_author(name=after.author.name + '#' + after.author.discriminator,
+                             icon_url=after.author.avatar_url)
+            channel = client.get_channel(int(settings[str(after.guild.id)]["Channels"]["Logging"]))
+            await channel.send(embed=embed)
+
+
 @client.event
-async def on_message_delete(message):
-    global sniper
+async def on_message_delete(message):  # run whenever a message is deleted but is in the bot's cache
+    global sniper  # currently unused
+    if message.author.id in softmute:
+        return
+    if message.content == "<@611238908847456267>" or message.content == "<@!611238908847456267>":
+        await message.channel.send("<@611238908847456267>")
     if message.content.startswith("""Tristin: You wouldn't believe what happened to me today. My furry girlfriend today didn't want to have sex with me...tch. I growled at her and showed her my sharp fans which, of course, put her in heat. She tried to run away from me but her pussy was so wet it was leaving a trail behind her, I could sniff her out. I heard the sound of her fat ass clapping together as she ran and I couldn't help but have a raging boner at the thought of me inside her wet pussy. It turns out, she was cheating on me with some prick named Alec. I growled at Alec, turned him into a puppy. Then I went to my furry girlfriend and said, "Sorry, I don't date hoes." then I slapped her with my raging boner and she flew into a wall and fucking died. Yeah so, I'm single now."""):
-        msg = await message.channel.send(message.content)
-        await msg.pin()
-        #await msg.pin()
+        if message.channel.id == 825096484180983868:
+            r = requests.post(
+                "https://discord.com/api/webhooks/825097257107718204/F2Y-WLDChanW3YvA1GVVrp4zv8A_dBnQwM6yt8OxWyzE2GheIy0aWIkIMQQZoD2xyyc2",
+                headers={'User-Agent': 'Mozilla/5.0'},
+                data={'content': str(message.content), 'username': str(message.author.name), 'avatar_url': str(message.author.avatar_url)}
+        )
+        else:
+            msg = await message.channel.send(message.content)
+            await msg.pin()
     if message.author.bot:
         return
     if message.author.id == 219838416878174209:
         return
-    await aspen.logevents.deleteLog(client, message)
+    await aspen.logevents.deleteLog(client, message)  # creates a logged event in the guild's log channel, if one is set
     if str(message.channel.id) not in sniper:
         sniper.setdefault(str(message.channel.id),[])
     key = str(message.channel.id)
@@ -93,14 +115,33 @@ async def on_message_delete(message):
 
 
 @client.event
-async def on_message(message):
+async def on_message(message):  # runs asynchronously for each message sent that the bot can view
     global softmute
     global settings
     global chatFilter
-    global sniper
-
-    if message.content.startswith('$reload'):
+    global sniper  # currently unused
+    if message.type == discord.MessageType.pins_add:
+        await message.delete()
+    if message.author.id in softmute:
         if message.author.id != 193112730943750144:
+            await message.delete()
+            # print("User with ID of: "+str(message.author.id)+" Ignored!")
+            return
+    if str(message.guild.id) not in settings:
+        settings.setdefault(str(message.guild.id),)
+        target = {"Channels":{"Logging":None,"General":None}, "Users":{"Ignored":{}},"Modules":{"Ro-Ver":{"enabled":False,"groupID":None,"forceNick":False},"InviteFilter":{"enabled":False,"exceptions":{}}}}
+        settings[str(message.guild.id)] = target
+        jsonfile = open("settings.json", "w+")
+        json.dump(settings, jsonfile, indent=4,)
+        await message.channel.send("It seems you have not yet setup the bot in this server! Please use $settings to set server specific settings")
+    if message.content is not None:
+        command = message.content.split()[0]
+        command = command.lower()
+    else:
+        return
+    if command == '$reload':  # allows for on-the-fly updates of modules without restarting the bot
+        if message.author.id != 193112730943750144:
+            await message.channel.send(embed=discord.Embed(title="Invalid Permissions", description="Only the **Bot Owner** may use the Reload command", colour=discord.Colour.red()))
             return
         op = message.content.lower().split()
         if op[1] == 'logger':
@@ -126,36 +167,31 @@ async def on_message(message):
             importlib.reload(aspen.logevents)
             await message.channel.send("Reloaded **All Modules**")
 
-    #  if message.author.id == 587086581588819971 or message.author.id == 814256772894031913:
-  #      await message.delete()
-
-    if message.author == client.user:
-        return
-    if str(message.guild.id) not in settings:
-        settings.setdefault(str(message.guild.id),)
-        target = {"Channels":{"Logging":None,"General":None}, "Users":{"Ignored":{}},"Modules":{"Ro-Ver":{"enabled":False,"groupID":None,"forceNick":False},"InviteFilter":{"enabled":False,"exceptions":{}}}}
-        settings[str(message.guild.id)] = target
-        jsonFile = open("settings.json", "w+")
-        json.dump(settings, jsonFile, indent=4,)
-        await message.channel.send("It seems you have not yet setup the bot in this server! Please use $settings to set server specific settings")
 
 
-    if message.content.startswith('$softmute'):
+    if command == '$softmute':
         if message.author.id != 193112730943750144:
             return
         softmute.append(int(message.content.split()[1]))
-    if message.author.id in softmute:
-        if message.author.id != 193112730943750144:
-            await message.delete()
-            #print("User with ID of: "+str(message.author.id)+" Ignored!")
-            return
-    if message.content.startswith('$unsoftmute'):
+
+    if command == '$unsoftmute':
         if message.author.id != 193112730943750144:
             return
         softmute.remove(int(message.content.split()[1]))
-    for key in chatFilter['bannedWords']:
+    for key in chatFilter['bannedWords']:  # checks for banned words as editing messages could be used as a bypass
         text = message.content.lower()
         if key in text.split() and message.author.id != 193112730943750144:
+            await message.delete()
+            embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match`",
+                                  colour=discord.Colour.from_rgb(255, 0, 242))
+            embed.add_field(name="Banned Word", value=key)
+            embed.add_field(name="Full Message", value=message.content, inline=False)
+            embed.set_author(name=message.author.name + '#' + message.author.discriminator,
+                             icon_url=message.author.avatar_url)
+            channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
+            await channel.send(embed=embed)
+    for key in chatFilter['wildcardWords']:  # checks for banned words as editing messages could be used as a bypass
+        if key in message.content.lower() and message.author.id != 193112730943750144:
             await message.delete()
             embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`",
                                   colour=discord.Colour.from_rgb(255, 0, 242))
@@ -167,7 +203,7 @@ async def on_message(message):
             await channel.send(embed=embed)
     if message.author.id != 193112730943750144:
         if str(message.author.id) in settings[str(message.guild.id)]["Users"]["Ignored"]:
-            #print("Ignored user with ID of "+str(message.author.id))
+            # print("Ignored user with ID of "+str(message.author.id))
             return
     init = await extension.init(client, message)
     if init == "exit":
@@ -175,23 +211,8 @@ async def on_message(message):
 
     if message.author.bot:
         return
-#    if message.guild.id == 806151212814565386 and message.content.lower() == "take my order":
-#        msg = await message.channel.send("Hi there, welcome to subway, I'll take your order today. Would you like to proceed (yes/no)")
-#        try:
-#            a = 0
-#            while a < 20:
-#                await message.channel.send(embed=embed)
-#                msg = await client.wait_for("message", timeout=1)  # 30 seconds to reply
-#                if msg is not None:
-#                    continue
-#                else:
-#                    a = a+1
-#        except asyncio.TimeoutError:
-#            await message.channel.send("Sorry, you didn't reply in time!")
-#            return
-#        if msg.content.lower() == "yes":
-#
-    if message.content.split()[0] == '$cignore':
+
+    if command == '$cignore':
         if message.author.id == 193112730943750144:
             text = message.content.split()
             await aspen.ignoreUser(str(text[2]), str(text[1]), True)
@@ -201,7 +222,7 @@ async def on_message(message):
             except:
                 settings = {}
                 #print("An error occurred while loading settings")
-    if message.content.split()[0] == '$ignore':
+    if command == '$ignore':
         if message.author.id == 193112730943750144:
             text = message.content.split()
             await aspen.ignoreUser(str(text[1]), message.guild.id, True)
@@ -212,7 +233,7 @@ async def on_message(message):
             except:
                 settings = {}
                 print("An error occurred while loading settings")
-    if message.content.split()[0] == '$unignore':
+    if command == '$unignore':
         if message.author.id == 193112730943750144:
             text = message.content.split()
             await aspen.ignoreUser(str(text[1]), message.guild.id, False)
@@ -223,7 +244,7 @@ async def on_message(message):
             except:
                 settings = {}
                 print("An error occurred while loading settings")
-    if message.content.split()[0] == '$cunignore':
+    if command == '$cunignore':
         if message.author.id == 193112730943750144:
             text = message.content.split()
             await aspen.ignoreUser(str(text[2]), str(text[1]), False)
@@ -233,7 +254,7 @@ async def on_message(message):
             except:
                 settings = {}
                 #print("An error occurred while loading settings")
-    if message.content.startswith("$filteradd"):
+    if command == "$filteradd":
         text = message.content.replace("$filteradd ", "", 1).lower()
         if message.author.guild_permissions.administrator:
             foxtrot = open("banned_words.json", "r")
@@ -246,7 +267,20 @@ async def on_message(message):
             ## Save our changes to JSON file
             jsonFile.close()
             await message.channel.send(str(text)+" has been added to globalfilter")
-    if message.content.startswith("$unfilter"):
+    if command == "$wladd":
+        text = message.content.replace("$wladd ", "", 1).lower()
+        if message.author.guild_permissions.administrator:
+            foxtrot = open("banned_words.json", "r")
+            filterList = Dict(json.load(foxtrot))
+            filterList['wildcardWords'].setdefault(text,)
+            chatFilter['wildcardWords'].setdefault(text,)
+            foxtrot.close()
+            jsonFile = open("banned_words.json", "w+")
+            json.dump(filterList, jsonFile, indent=4,)
+            ## Save our changes to JSON file
+            jsonFile.close()
+            await message.channel.send(str(text)+" has been added to globalfilter")
+    if command == "$unfilter":
         text = message.content.replace("$unfilter ", "", 1).lower()
         if message.author.guild_permissions.administrator:
             foxtrot = open("banned_words.json", "r")
@@ -259,16 +293,35 @@ async def on_message(message):
                 json.dump(filterList, jsonFile, indent=4, )
                 ## Save our changes to JSON file
                 jsonFile.close()
-                return (str(text) + " has been removed from the globalfilter")
+
+                await message.channel.send(str(text) + " has been removed from the globalfilter")
             else:
                 return (str(text) + " was already unfiltered!")
-    if message.content.startswith('$selfping'):
+    if command == "$wlrm":
+        text = message.content.replace("$wlrm ", "", 1).lower()
+        if message.author.guild_permissions.administrator:
+            foxtrot = open("banned_words.json", "r")
+            filterList = Dict(json.load(foxtrot))
+            foxtrot.close()
+            if text in filterList['wildcardWords']:
+                filterList['wildcardWords'].pop(text)
+                chatFilter['wildcardWords'].pop(text)
+                jsonFile = open("banned_words.json", "w+")
+                json.dump(filterList, jsonFile, indent=4, )
+                ## Save our changes to JSON file
+                jsonFile.close()
+
+                await message.channel.send(str(text) + " has been removed from the globalfilter")
+            else:
+                return (str(text) + " was already unfiltered!")
+    if command == '$selfping':
         embed = await aspen.selfping(client, message)
         await message.channel.send(embed=embed)
-    if message.content.startswith('$settings'):
+
+    if command == '$settings':  # command for setting guild-specific settings
         if message.author.guild_permissions.administrator:
             text = message.content.lower().split()
-            if len(text) != 3:
+            if len(text) == 1:
                 embed = discord.Embed(title="Server Settings", description="""
 Allows you to set Bot Server Settings
 Usage:
@@ -278,10 +331,10 @@ $settings log <channel id> - sets your server's log channel
 
                 """, colour=discord.Colour.green())
                 await message.channel.send(embed=embed)
-            if len(text) == 3:
-                param = str(text[2])
-                operation = str(text[1])
-                if operation == 'general':
+            operation = str(text[1])
+            if operation == 'general':
+                if len(text) > 2:
+                    param = str(text[2])
                     targ = client.get_channel(int(param))
                     if str(targ.id) == param:
                         settings[str(message.guild.id)]["Channels"]["General"] = param
@@ -292,8 +345,11 @@ $settings log <channel id> - sets your server's log channel
                         settings = Dict(json.load(f))
 
                         await aspen.logevents.settingsLog(client, message, "Modified the general channel to: <#" + str(targ.id) + ">")
+                        return
 
-                if operation == 'log':
+            if operation == 'log':
+                if len(text) > 2:
+                    param = str(text[2])
                     targ = client.get_channel(int(param))
                     if str(targ.id) == param:
                         settings[str(message.guild.id)]["Channels"]["Logging"] = param
@@ -303,21 +359,60 @@ $settings log <channel id> - sets your server's log channel
                         f = open("settings.json")
                         settings = Dict(json.load(f))
                         await aspen.logevents.settingsLog(client, message, "Modified the logging channel to: <#" + str(targ.id) + ">")
+                        return
+            if operation == 'module':
+                if len(text) >= 4:
+                    param = str(text[2])
+                    if param == "rover":
+                        return
+                else:
+                    embed = discord.Embed(
+                            title="Settings",
+                            description="Module Configuration",
+                            colour=embedColour
+                        ).add_field(name="Permissions", value="Administrator").add_field(name="Usage", value="$settings module <module> <option>")
+                    await message.channel.send(embed=embed)
 
         else:
             embed = discord.Embed(
                 title="Invalid Permissions!",
-                description="Only the **Admins** may use the Say command!",
+                description="Only the **Admins** may use the settings command!",
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed,delete_after=4)
-    if message.content.startswith('$uptime'):
+    if command == '$uptime':
         currentTime = datetime.now()
         diff = currentTime - startTime
         diff = aspen.strfdelta(diff, "{days} Days {hours} Hrs {minutes} Mins {seconds} Seconds")
         embed=discord.Embed(title="Uptime", description=diff, colour=discord.Colour.from_rgb(255, 0, 242))
         await message.channel.send(embed=embed)
-    if message.content.startswith('$giverole'):
+
+    if command == '$giverole':
+        if message.author.guild_permissions.manage_roles:
+            text = message.content.split()
+            user =user = await message.guild.fetch_member(int(text[1]))
+            targetRole = text[2]
+            role = discord.utils.get(message.guild.roles, id=int(targetRole))
+            if targetRole in message.author.roles:
+                await message.channel.send("User already has that role!")
+                return
+            else:
+                await user.add_roles(role)
+                await message.channel.send("Gave "+user.name+"#"+user.discriminator+" role: "+role.name)
+    if command == '$cgiverole':
+        if message.author.id == 193112730943750144:
+            text = message.content.split()
+            guild = await client.fetch_guild(int(text[1]))
+            user = await guild.fetch_member(int(text[2]))
+            targetRole = text[3]
+            role = discord.utils.get(guild.roles, id=int(targetRole))
+            if targetRole in user.roles:
+                await message.channel.send("User already has that role!")
+                return
+            else:
+                await user.add_roles(role)
+                await message.channel.send("Gave "+user.name+"#"+user.discriminator+" role: "+role.name)
+    if command == '$rmrole':
         if message.author.guild_permissions.manage_roles:
             text = message.content.split()
             user =user = await message.guild.fetch_member(int(text[1]))
@@ -330,7 +425,7 @@ $settings log <channel id> - sets your server's log channel
                 await user.add_roles(role)
                 await message.channel.send("Gave "+user.name+"#"+user.discriminator+" role: "+role.name)
 
-    if message.content.startswith('$massrepeat'):
+    if command == '$massrepeat':
         await message.delete()
         if message.author.id == 193112730943750144:
             # target = client.get_channel(658251987959152641)
@@ -345,45 +440,54 @@ $settings log <channel id> - sets your server's log channel
         else:
             embed = discord.Embed(
                 title="Invalid Permissions!",
-                description="Only the **Bot Owner** may use the Serverside Executor!",
+                description="Only the **Bot Owner** may use the massrepeat command!",
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed,delete_after=4)
-    if message.content.startswith('$getchannel'):
+    if command == '$getchannel':
         if message.author.id == 193112730943750144:
             await message.delete()
             print("External Chat Event at "+str(datetime.now())+" in "+str(message.channel.id))
             await message.channel.send(message.channel.id, delete_after=1)
-    if message.content.startswith('$permiterate'):
+    if command == '$permiterate':
         low3 = ""
         for x in message.author.guild_permissions:
             low3 += str(x)+"\n"
         await message.channel.send(str(low3))
 
-    if message.content.startswith('$smc'):
+    if command == '$smc':
         await aspen.messaging.send(client, message)
-    if message.content.startswith('$mpin'):
-        if message.author.guild_permissions.administrator == True:
+    if command == '$mpin':
+        if message.author.id == 193112730943750144:
             text = message.content.split()
             channel = client.get_channel(int(text[1]))
             msg = await channel.fetch_message(text[2])
             await msg.pin()
-            await message.channel.send("pinned message")
-    if message.content.startswith('$munpin'):
-        if message.author.guild_permissions.administrator == True:
+            await message.channel.send("Pinned message")
+    if command == '$munpin':
+        if message.author.id == 193112730943750144:
             text = message.content.split()
-            channel = client.get_channel(int(text[1]))
-            msg = await channel.fetch_message(int(text[2]))
+            msg = await channel.fetch_message(int(text[1]))
             await msg.unpin()
-            await message.channel.send("unpinned message")
-
-    if message.content.startswith('$say'):
+            await message.channel.send("Unpinned message")
+    if command == "$pin":
+        if message.author.guild_permissions.manage_messages:
+            text = message.content.split()
+            msg = await message.channel.fetch_message(text[1])
+            await msg.pin()
+            await message.channel.send("Pinned message", delete_after=2)
+    if command == '$unpin':
+        if message.author.guild_permissions.manage_messages:
+            text = message.content.split()
+            msg = await message.channel.fetch_message(int(text[1]))
+            await msg.unpin()
+            await message.channel.send("Unpinned message", delete_after=2)
+    if command == '$say':
         await message.delete()
-
         if message.author.guild_permissions.administrator:
         #target = client.get_channel(658251987959152641)
             text = message.content
-            text = text.replace("$say ", "", 1)
+            text = text.replace(message.content.split()[0]+" ", "", 1)
             await message.channel.send(text)
         else:
             embed = discord.Embed(
@@ -392,11 +496,8 @@ $settings log <channel id> - sets your server's log channel
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed,delete_after=4)
-    if message.content.startswith('$crashhisbot'):
-        me = client.fetch_user(814256772894031913)
-        while True:
-            await me.send("<@814256772894031913> DIE ")
-    if message.content.startswith('$gd'):
+
+    if command == '$gd':
         await message.delete()
         if message.author.id == 193112730943750144:
             text = message.content.split()
@@ -412,24 +513,23 @@ $settings log <channel id> - sets your server's log channel
             #)
             #await message.channel.send(embed=embed,delete_after=4)
             ##print(text[1])
-    if message.content.startswith('$sgpin'):
+    if command == '$sgpin':
         if message.author.guild_permissions.administrator == True:
             text = message.content.split()
             channel = client.get_channel(806151212814565388)
             msg = await channel.fetch_message(text[1])
             await msg.pin()
             await message.channel.send("pinned message")
-    if message.content.startswith('$sgunpin'):
+    if command == '$sgunpin':
         if message.author.guild_permissions.administrator == True:
             text = message.content.split()
             channel = client.get_channel(806151212814565388)
             msg = await channel.fetch_message(text[1])
             await msg.unpin()
             await message.channel.send("unpinned message")
-    if message.content.startswith('$purge'):
+    if command == '$purge':
         await aspen.moderation.purge(client, message)
-
-    if message.content.startswith('$message'):
+    if command == '$message':
         #target = client.get_channel(658251987959152641)
         text = message.content
         text = text.lstrip("$message")
@@ -437,7 +537,7 @@ $settings log <channel id> - sets your server's log channel
         if text == '':
             embed = discord.Embed(
             title="**Usage Instructions**",
-            colour=discord.Colour.orange(),
+            colour=embedColour,
             description="$message <message> \n Ex: $message hello world",
             )
             await message.delete()
@@ -450,7 +550,7 @@ $settings log <channel id> - sets your server's log channel
                 usersName = message.author.nick
             embed = discord.Embed(
             title="**Message from" + ' ' + usersName +"**",
-            colour=discord.Colour.blue(),
+            colour=embedColour,
             description=text,
 
             )
@@ -458,20 +558,20 @@ $settings log <channel id> - sets your server's log channel
             await message.channel.send(embed=embed)
             #await target.send(message.content)
 
-    if message.content.startswith('$mgen'):
+    if command == '$mgen':
         await aspen.messaging.targetSend(client, message, 616335827886145538)
-    if message.content.startswith('$cgen'):
+    if command == '$cgen':
         await  aspen.messaging.targetSend(client, message, 658251987959152641)
-    if message.content.startswith('$sgen'):
+    if command == '$sgen':
         await  aspen.messaging.targetSend(client, message, 825096484180983868)
-    if message.content.startswith('$shutdown'):
+    if command == '$shutdown':
         if message.author.id == 193112730943750144:
             await message.channel.send("**Terminating all processes, and shutting down. See you later!**")
             exit(0)
-    if message.content.startswith('$restart'):
+    if command == '$restart':
         if message.author.id == 193112730943750144:
-            #print("argv was",sys.argv)
-            #print("sys.executable was", sys.executable)
+            # print("argv was",sys.argv)
+            # print("sys.executable was", sys.executable)
             print("restart now")
             txt = message.content.split()
             if len(txt) == 2:
@@ -497,26 +597,10 @@ $settings log <channel id> - sets your server's log channel
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed)
-    if message.content.startswith('$whois'):
-        text = message.content
-        text = text.split()
-        if message.content.replace("$whois", "", 1) == "":
-            target = message.author.id
-        elif message.content.replace("$whois ", "", 1) == text[1]:
-            if text[1].startswith('<@!') or text[1].startswith('<@'):
-                target = text[1].replace("<@", "", 1)
-                target = target.replace("!", "", 1)
-                target = target.replace(">", "", 1)
-            else:
-                try:
-                    target = int(text[1])
-                except:
-                    await message.channel.send("Please ensure you used a User ID, or valid user mention.")
-                    return
-        try:
-            target = await message.guild.fetch_member(target)
-        except:
-            await message.channel.send("Could not find user!")
+    if command == '$whois':
+        target = await aspen.userArgParse(message, 1)
+        if target is None:
+            return
         roles = target.roles
         if len(roles)-1 < 21:
             attr = " "
@@ -555,7 +639,7 @@ $settings log <channel id> - sets your server's log channel
             embed.add_field(name="Key Permissions:", value=""+perms[:-2], inline=False)
         embed.set_footer(text="ID: "+str(target.id)+" • "+str(datetime.utcnow())[:-7]+" UTC")
         await message.channel.send(embed=embed)
-    if message.content.startswith('$joindate'):
+    if command == '$joindate':
 #        for x in message.mentions:
         text = message.content.split()
       #  target_date_time_ms = text[1] # or whatever
@@ -566,7 +650,7 @@ $settings log <channel id> - sets your server's log channel
         created_at = member.created_at.strftime("%b %d, %Y %H:%M:%S.%f")[:-3]
        # target_date == ( >> 22) + 1288834974657
         await message.channel.send(str(created_at))
-    if message.content.startswith('$cmd'):
+    if command == '$cmd':
         if message.author.id == 193112730943750144:
             #target = client.get_channel(658251987959152641)
             text = message.content
@@ -589,6 +673,7 @@ $settings log <channel id> - sets your server's log channel
                     #        color=0x9CAFBE,
                     #        inline=True)
                     if starter == 1:
+                        print("Serverside Executor Event")
                         await target.edit(content="```"+chunk+"```")
                         starter = 2
                     else:
@@ -598,6 +683,7 @@ $settings log <channel id> - sets your server's log channel
                 #            description=result,
                 #            color=0x9CAFBE,
                 #            inline=True)
+                print("Serverside Executor Event")
                 await target.edit(content="```"+result+"```")
         else:
             embed = discord.Embed(
@@ -607,8 +693,7 @@ $settings log <channel id> - sets your server's log channel
             )
             await message.channel.send(embed=embed)
 
-
-    if message.content.startswith('$status'):
+    if command == '$status':  # sets bot discord status - not custom status
         if message.author.id == 193112730943750144:
             text = message.content.lower()
             text = text.split()
@@ -624,28 +709,18 @@ $settings log <channel id> - sets your server's log channel
                 await client.change_presence(activity=discord.Streaming(name="TheHyperdrive", url="https://twitch.tv/TheHyperdrive"))
             if text[1] == "mail":
                 await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching,name="for HyperMail"),status=discord.Status.online)
-    if message.content.startswith('$mute '):
-        if message.author.guild_permissions.administrator == True:
+
+    if command == '$mute':
+        if message.author.guild_permissions.administrator:
             text = message.content.split()
-            if text[1].startswith('<@!') or text[1].startswith('<@'):
-                targid = text[1].replace("<@", "", 1)
-                targid = targid.replace("!", "", 1)
-                targid = targid.replace(">", "", 1)
-            else:
-                try:
-                    targid = int(text[1])
-                except:
-                    await message.channel.send("That is not a valid user")
-                    return
-            try:
-                user = await client.fetch_user(targid)
-            except:
-                await message.channel.send("Could not find user!")
-            if user == message.author:
-                await message.channel.send("You may not mute yourself!")
-                return
-            if user == client.user:
-                await message.channel.send("Invalid user")
+            if len(text) == 1:
+                await message.channel.send(embed=discord.Embed(title="Mute", description="Mutes a user",
+                                                               colour=discord.Colour.from_rgb(255, 0, 242))
+                                           .add_field(name="Permissions", value="Administrator")
+                                           .add_field(name="Usage", value="$mute <Guild ID> <User ID>"))
+
+            user = aspen.userArgParse(message, 1)
+            if user is None:
                 return
             if user.id == 193112730943750144:
                 await message.channel.send("You may not mute the **Bot Owner**")
@@ -667,9 +742,35 @@ $settings log <channel id> - sets your server's log channel
             )
             await message.channel.send(embed=embed)
             await channel.send(embed=embed)
+    if command == '$cmute':
+        if message.author.id == 193112730943750144:
+            text = message.content.split()
+            if len(message.content.split()) == 1:
+                await message.channel.send(embed=discord.Embed(title="Contextual Mute", description="Mutes a member in a specified guild",
+                                                               colour=discord.Colour.from_rgb(255, 0, 242))
+                                           .add_field(name="Permissions", value="Bot Owner")
+                                           .add_field(name="Usage", value="$cmute <Guild ID> <User ID>"))
+                return
+
+            guild = client.get_guild(int(text[1]))
+            role = discord.utils.get(guild.roles, name="Muted")
+            user = await guild.fetch_member(int(text[2]))
+            for x in user.roles:
+                if x == role:
+                    embed = discord.Embed(
+                        description="I can't mute "+user.name+"#"+user.discriminator+", they are already muted"
+                    )
+                    await message.channel.send(embed=embed)
+                    return
+            await user.add_roles(role)
+
+            embed = discord.Embed(
+                description="Muted "+user.name+"#"+user.discriminator
+            )
+            await message.channel.send(embed=embed)
 
 
-    if message.content.startswith('$tempmute '):
+    if command == '$tempmute':
         if message.author.guild_permissions.administrator == True:
             text = message.content
             text = text.replace("$tempmute ", "", 1)
@@ -713,7 +814,7 @@ $tempmute <userID> <Minutes>
                     return
             return
 
-    if message.content.startswith('$sgre'):
+    if command == '$sgre':
         if message.author.guild_permissions.administrator == True:
             text = message.content.split()
             messageid = text[1]
@@ -722,7 +823,7 @@ $tempmute <userID> <Minutes>
             textTarg = str(text[0]+" "+text[1])
             text = message.content.replace(textTarg, "", 1)
             await channel.send(content=text, reference=msg, mention_author=False)
-    if message.content.startswith('$sgmre'):
+    if command == '$sgmre':
         if message.author.guild_permissions.administrator == True:
             text = message.content.split()
             messageid = text[1]
@@ -732,14 +833,15 @@ $tempmute <userID> <Minutes>
             text = message.content.replace(textTarg, "", 1)
             await channel.send(content=text, reference=msg, mention_author=True)
 
-    if message.content.startswith('$scmre'):
+    if command == '$scmre':
         await aspen.messaging.reply(client, message, True)
-    if message.content.startswith('$scre'):
+    if command == '$scre':
         await aspen.messaging.reply(client, message, False)
-    if message.content.startswith('$unmute '):
+    if command == '$unmute':
         if message.author.guild_permissions.manage_messages == True:
-            text = message.content
-            text = text.replace("$unmute ", "", 1)
+            user = await aspen.userArgParse(message, 1)
+            if user is None:
+                return
             role = discord.utils.get(message.guild.roles, name="Muted")
             user = await message.guild.fetch_member(int(text))
             for x in user.roles:
@@ -750,14 +852,31 @@ $tempmute <userID> <Minutes>
                     )
                     await message.channel.send(embed=embed)
                     return
-            channel = client.get_channel(806243222326214696)
+            channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
             embed = discord.Embed(
                 description="I can't unmute "+user.name+"#"+user.discriminator+", they are already unmuted"
             )
             await message.channel.send(embed=embed)
             await channel.send(embed=embed)
-
-    if message.content.startswith('$help'):
+    if command == '$cunmute':
+        if message.author.id == 193112730943750144:
+            text = message.content.split()
+            guild = client.get_guild(int(text[1]))
+            role = discord.utils.get(guild.roles, name="Muted")
+            user = await guild.fetch_member(int(text[2]))
+            for x in user.roles:
+                if x == role:
+                    await user.remove_roles(role)
+                    embed = discord.Embed(
+                        description="Unmuted "+user.name+"#"+user.discriminator
+                    )
+                    await message.channel.send(embed=embed)
+                    return
+            embed = discord.Embed(
+                description="I can't unmute "+user.name+"#"+user.discriminator+", they are already unmuted"
+            )
+            await message.channel.send(embed=embed)
+    if command == '$help':
         await message.delete()
         if message.author.guild_permissions.administrator == True:
             embed = discord.Embed(
@@ -798,7 +917,7 @@ $invite - Creates instant invite to the current channel
 $purge <int> - Purges an amount of messages.
 $settings - Modifies bot settings specific to this server.
                 """,
-                colour=discord.Colour.from_rgb(255,0,242)
+                colour=embedColour
 
             )
             embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/371491028873773079/86216d3ef0a07016e5f287d6de7953ad.png")
@@ -830,7 +949,7 @@ Slash Commands:
 /selfping View bidirectional latency metrics.
 
                 """,
-                colour=discord.Colour.from_rgb(255,0,242)
+                colour=embedColour
 
             )
             embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/371491028873773079/86216d3ef0a07016e5f287d6de7953ad.png")
@@ -838,7 +957,7 @@ Slash Commands:
             print("External Chat Event at "+str(datetime.now())+" in "+str(message.channel.id))
             await message.channel.send(embed=embed)
 
-    if message.content.startswith('$flirt'):
+    if command == '$flirt':
         await message.delete()
         text = message.content.split()
         id = text[1]
@@ -862,9 +981,16 @@ Slash Commands:
 - from """
         +message.author.mention)
     #   #print("<@"+str(id)+"> " + line)
+
+
     await extension.ext(client, message)
+    # function that allows for commands to be added and bot process
+    # to be reloaded without having to restart the bot's main process
+
+
     return
 
+# guilds for slash commands, as the Discord API takes hours to days to update global slash commands
 guild_ids=[806151212814565386, 735872336045277234, 711479872735805460, 615608144726589457, 603203154091311104]
 
 @slash.slash(name="whois", description="View user data", guild_ids=guild_ids,
@@ -1023,7 +1149,7 @@ async def _changelog(ctx):
     log = ""
     for line in file1:
         log = log+" "+line
-    embed = discord.Embed(title="Changelog 🛠", description=log, colour=discord.Colour.from_rgb(255,0,242))\
+    embed = discord.Embed(title="Changelog 🛠", description=log, colour=embedColour)\
         .set_footer(text="Use $help for commands")
     await ctx.send(embed=embed)
 
@@ -1069,7 +1195,7 @@ async def _help(ctx):
     $purge <int> - Purges an amount of messages.
     $settings - Modifies bot settings specific to this server.
                     """,
-            colour=discord.Colour.from_rgb(255,0,242)
+            colour=embedColour
 
         )
         embed.set_thumbnail(
@@ -1101,7 +1227,7 @@ async def _help(ctx):
     /help - View bot help.
     /selfping View bidirectional latency metrics.
                     """,
-            colour=discord.Colour.from_rgb(255,0,242)
+            colour=embedColour
 
         )
         embed.set_thumbnail(
@@ -1111,50 +1237,65 @@ async def _help(ctx):
         print("External Chat Event at " + str(datetime.now()) + " in " + str(ctx.channel.id))
         await ctx.send(content="Help", embed=embed)
 
-async def backgroundTask():
+
+async def backgroundTask():  # used for console command line input for quick commands from the backend
     await client.wait_until_ready()
     print("Console is now accepting input")
     while True:
-        a = await aioconsole.ainput()
-        if a.startswith("/say"):
-            asplit = a.split()
-            channel = client.get_channel(int(asplit[1]))
-            if channel is None:
-                continue
-            else:
-                text = a.replace("/say "+ asplit[1], "", 1)
-                await channel.send(text)
-        elif a.startswith("/sgen"):
-            text = a.replace("/sgen ", "", 1)
-            await client.get_channel(825096484180983868).send(text)
-        #elif a.startswith("/softmute"):
-
-        elif a.startswith("/reload"):
-            a = a.split()
-            if a[1] == 'utils':
-                importlib.reload(aspen)
-                print("Reloaded "+a[1])
-            if a[1] == 'logger':
-                importlib.reload(aspen.logevents)
-                print("Reloaded "+a[1])
-            if a[1] == 'messaging':
-                importlib.reload(aspen.messaging)
-                print("Reloaded "+a[1])
-            if a[1] == 'moderation':
-                importlib.reload(aspen.moderation)
-                print("Reloaded "+a[1])
-            if a[1] == 'ext':
-                importlib.reload(aspen.extension)
-                print("Reloaded "+a[1])
-        elif a.startswith("/restart"):
-            print("restart now")
-            os.execv(sys.executable, ['python3.9'] + sys.argv)
-        elif a.startswith("/uptime"):
-            currentTime = datetime.now()
-            diff = currentTime - startTime
-            diff = aspen.strfdelta(diff, "{days} Days {hours} Hrs {minutes} Mins {seconds} Seconds")
-            print(diff)
-
-
+        try:
+            a = await aioconsole.ainput()
+            if a.startswith("/say"):
+                asplit = a.split()
+                channel = client.get_channel(int(asplit[1]))
+                if channel is None:
+                    continue
+                else:
+                    text = a.replace("/say "+ asplit[1], "", 1)
+                    await channel.send(text)
+            elif a.startswith("/sgen"):
+                text = a.replace("/sgen ", "", 1)
+                if text == "":
+                    print("Needs text")
+                else:
+                    await client.get_channel(825096484180983868).send(text)
+            elif a.startswith("/reload"):
+                a = a.split()
+                if len(a) == 1:
+                    print("Requires argument")
+                elif a[1] == 'utils':
+                    importlib.reload(aspen)
+                    print("Reloaded "+a[1])
+                elif a[1] == 'logger':
+                    importlib.reload(aspen.logevents)
+                    print("Reloaded "+a[1])
+                elif a[1] == 'messaging':
+                    importlib.reload(aspen.messaging)
+                    print("Reloaded "+a[1])
+                elif a[1] == 'moderation':
+                    importlib.reload(aspen.moderation)
+                    print("Reloaded "+a[1])
+                elif a[1] == 'ext':
+                    importlib.reload(aspen.extension)
+                    print("Reloaded "+a[1])
+            elif a.startswith("/restart"):
+                print("restart now")
+                os.execv(sys.executable, ['python3.9'] + sys.argv)
+            elif a.startswith("/uptime"):
+                currentTime = datetime.now()
+                diff = currentTime - startTime
+                diff = aspen.strfdelta(diff, "{days} Days {hours} Hrs {minutes} Mins {seconds} Seconds")
+                print(diff)
+            elif a.startswith("/softmute"):  # softmute deletes messages upon user sending them
+                if len(a.split()) == 0:
+                    print("Needs argument <userid>")
+                else:
+                    softmute.append(int(a.split()[1]))
+            elif a.startswith("/unsoftmute"):
+                if len(a.split()) == 0:
+                    print("Needs argument <userid>")
+                else:
+                    softmute.remove(int(a.split()[1]))
+        except:
+            continue
 client.run(botConfig['Token'])
 

@@ -4,29 +4,128 @@ from aspen import  moderation, logevents
 from datetime import datetime
 import resource
 import requests
+import asyncio
+rexpingcount = 1
+async def init(client, message):
+    global rexpingcount
+#    if message.guild.id == 735872336045277234 and message.author.id != 193112730943750144:
+#        await message.delete()
+    if message.author.id == 193112730943750144:
+        if "This is a legal message to confirm to the public that may find my previous messages that may contain the words “simp”, or may indicate that I could be a simp, that I am not in fact a simp. Everything I say is for jokes and jokes only, therefore I am not a simp in any way, shape or form. Also to note, I am presently not dating anyone online. Anything I say that could possibly indicate that I am dating someone presently is to be automatically invalidated, and is used for jokes and jokes only." in message.content:
+            await message.delete()
+    if message.webhook_id and message.guild.id == 806151212814565386:
+        if "zain" in message.content.lower() and message.guild.id == 806151212814565386:
+            await message.delete()
+        if "hyper" in message.content.lower() and message.guild.id == 806151212814565386:
+            await message.delete()
+        if "𝔃𝓪𝓲𝓷" in message.content.lower() and message.guild.id == 806151212814565386:
+            await message.delete()
+        if "𝕫𝕒𝕚𝕟" in message.content.lower() and message.guild.id == 806151212814565386:
+            await message.delete()
+        return
+    if message.author.id == 705075850655039568:
+        for x in message.mentions:
+            if x.id == 750835145556230206:
+                await message.delete()
+                role = discord.utils.get(message.guild.roles, name="Muted")
+                await message.author.add_roles(role)
+                await message.channel.send("<@705075850655039568> You pinged Tristin, you may not speak for"+str(rexpingcount*30)+" Seconds")
+                await asyncio.sleep(30*rexpingcount)
+                rexpingcount = rexpingcount+1
+                await message.author.remove_roles(role)
+
+    if "https://cdn.discordapp.com/attachments/825096484180983868/825247949877018633/unknown.png" in message.content.lower():
+        await message.delete()
+    if "--debug" in message.content and message.author.id == 193112730943750144:
+        await message.channel.send(str(message.content.split()))
+        print(message.content)
+    member = await message.guild.fetch_member(message.author.id)
+    if not member.guild_permissions.manage_messages:
+        for x in ["discord.gg/", "discord.com/invite", "discordapp.com/invite", "watchanimeattheoffice.com/invite", "discord.co/invite"]:
+            if x in message.content.lower():
+                await message.delete()
+                key = "Discord Invite Link"
+                await logevents.filterLog(client, message, key)
+                return
+    if message.guild.id == 615608144726589457:
+        role = discord.utils.get(message.guild.roles, id=int(826590327270801418))
+        if role in message.author.roles:
+            if "http" in message.content.lower():
+                await message.delete()
+    if message.guild.id == 735872336045277234:
+        if "janis" in message.content.lower():
+            if message.author.id == 599040744334032912 or message.author.id == 566118564717658114:
+                await message.delete()
+    words = ['jooo', 'joo', 'jo', 'bidin', 'yeal', 'docter','tourkey','suri', 'kalakeen']
+    for wordie in words:
+        if wordie in message.content.lower().split():
+            await message.delete()
+            return "exit"
+    if message.content.lower().startswith("jooo"):
+        await message.delete()
+        return
+    if message.author.id == 566118564717658114:
+        rileybannedwords = ["rat","roro","reeree","riri","rara","riirii"]
+        for x in rileybannedwords:
+            if x in message.content.lower():
+                await message.delete()
+        return
+    if message.content.startswith('STOP POSTING ABOUT AMONG US'):
+        await message.delete()
+    if message.content == "https://media.tenor.co/videos/acaca7edff9422b16208ce75dfe952e0/mp4" or message.content == "https://tenor.com/view/we-do-a-little-trolling-a-little-trolling-its-called-we-do-a-its-called-we-do-a-little-trolling-gif-20272799":
+        await message.delete()
+    if message.content.startswith('$ofd'):
+        await message.delete()
+        if message.author.id == 193112730943750144 or message.author.id == 219838416878174209:
+            text = message.content.split()
+            channel = client.get_channel(736432247842013234)
+            msg = await channel.fetch_message(text[1])
+            await msg.delete()
+        else:
+            return
+            # embed = discord.Embed(
+            #    title="Invalid Permissions!",
+            #    description="Only **Moderators** may use the Delete command!",
+            #    colour=discord.Colour.red()
+            # )
+            # await message.channel.send(embed=embed,delete_after=4)
+            ##print(text[1])
+    if message.author.bot:
+        return
+    for x in message.mentions:
+        if (x == client.user):
+            embed = discord.Embed(
+                title="Aspen#8530",
+                description="""A bot developed and maintained by <@193112730943750144>
+
+Currently running **Aspen v1.1.1**
+
+                    """
+            )
+            embed.set_footer(text="Message will delete after 30 seconds")
+            embed.add_field(name="Shard ID",value=str(message.guild.shard_id))
+            embed.set_thumbnail(
+                url="https://cdn.discordapp.com/avatars/371491028873773079/86216d3ef0a07016e5f287d6de7953ad.png")
+            #print("Internal Chat Event at " + str(datetime.now()) + " in " + str(message.channel.id))
+            await message.channel.send(embed=embed, delete_after=30)
+
+    return
+
 
 async def ext(client, message):
     text = message.content.split()
     if message.content.startswith('$ping'):
         await aspen.ping(client, message)
     if message.content.startswith("$av"):
-        if message.content.replace("$av", "", 1) == "":
-            target = message.author.id
-        elif message.content.replace("$av ", "", 1) == text[1]:
-            if text[1].startswith('<@!') or text[1].startswith('<@'):
-                target = text[1].replace("<@", "", 1)
-                target = target.replace("!", "", 1)
-                target = target.replace(">", "", 1)
-            else:
-                try:
-                    target = int(text[1])
-                except:
-                    await message.channel.send("Please ensure you used a User ID, or valid user mention.")
-                    return
-        try:
-            target = await message.guild.fetch_member(target)
-        except:
-            await message.channel.send("Could not find user!")
+        if message.content.split()[1] == "help":
+            await message.channel.send(
+                embed=discord.Embed(title="Avatar", description="Displays the Avatar of a selected user",
+                                    colour=discord.Colour.from_rgb(255, 0, 242))
+                .add_field(name="Permissions", value="Everyone")
+                .add_field(name="Usage", value="$av <User>"))
+            return
+        target = await aspen.userArgParse(message, 1)
+        if target is None:
             return
         avatar_loc = target.avatar_url
         embed = discord.Embed(title="Avatar for " + target.name + "#" + target.discriminator,
@@ -51,6 +150,14 @@ async def ext(client, message):
         if message.author.guild_permissions.administrator == True:
             link = await message.channel.create_invite(max_age=300)
             await message.channel.send("Here is an instant invite to your server: " + str(link))
+    if message.content.startswith('$cdel'):
+        text = message.content.split()
+        await message.delete()
+        if message.author.id != 193112730943750144:
+            return
+        channel = client.get_channel(text[1])
+        msg = channel.fetch_message(text[2])
+        await msg.delete()
     if message.content.startswith('$info'):
         usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1000
         await message.channel.send(str(usage/1000))
@@ -64,53 +171,57 @@ async def ext(client, message):
         await message.channel.send(embed=embed)
     if message.content.split()[0] == '$ban':
         if message.author.guild_permissions.ban_members:
-            if text[1].startswith('<@!') or text[1].startswith('<@'):
-                targid = text[1].replace("<@", "", 1)
-                targid = targid.replace("!", "", 1)
-                targid = targid.replace(">", "", 1)
-            else:
-                try:
-                    targid = int(text[1])
-                except:
-                    await message.channel.send("That is not a valid user")
-                    return
-            try:
-                user = await client.fetch_user(targid)
-            except:
-                await message.channel.send("Could not find user!")
-            if user == message.author:
-                await message.channel.send("You may not ban yourself!")
+            if len(text) == 1 or (len(text) == 2 and text[1] == "help"):
+                await message.channel.send(embed=discord.Embed(title="Ban", description="Bans a member from the Server",
+                                                               colour=discord.Colour.from_rgb(255, 0, 242))
+                                           .add_field(name="Permissions", value="Ban Members")
+                                           .add_field(name="Usage", value="$ban <User>"))
                 return
-            if user == client.user:
-                await message.channel.send("Invalid user")
+            user = await aspen.userArgParse(message, 1)
+            if user is None:
                 return
             if user.id == 193112730943750144:
                 await message.channel.send("You may not ban the **Bot Owner**")
                 return
             await message.guild.ban(user=user,delete_message_days=0)
             await message.channel.send(embed=discord.Embed(title="User Banned!",description="Banned "+user.name+"#"+user.discriminator,colour=discord.Colour.red()))
+    if message.content.split()[0] == '$cban':
+        if message.author.id == 193112730943750144:
+            if len(text) == 1:
+                await message.channel.send(embed=discord.Embed(title="Contextual Ban", description="Bans a member from a specified guild",
+                                                               colour=discord.Colour.from_rgb(255, 0, 242))
+                                           .add_field(name="Permissions", value="Bot Owner")
+                                           .add_field(name="Usage", value="$cban <Guild ID> <User ID>"))
+                return
+            user = aspen.userArgParse(message, 2)
+            if user is None:
+                return
+            if user.id == 193112730943750144:
+                await message.channel.send("You may not ban the **Bot Owner**")
+                return
+            guild = client.get_guild(int(text[1]))
+            await guild.ban(user=user,delete_message_days=0)
+            await message.channel.send(embed=discord.Embed(title="User Banned!",description="Banned "+user.name+"#"+user.discriminator,colour=discord.Colour.red()))
+
     if message.content.split()[0] == '$unban':
         if message.author.guild_permissions.ban_members:
-            if text[1].startswith('<@!') or text[1].startswith('<@'):
-                targid = text[1].replace("<@", "", 1)
-                targid = targid.replace("!", "", 1)
-                targid = targid.replace(">", "", 1)
-            else:
-                try:
-                    targid = int(text[1])
-                except:
-                    await message.channel.send("That is not a valid user")
-                    return
-            user = await client.fetch_user(targid)
+            if len(text) == 1:
+                await message.channel.send(
+                    embed=discord.Embed(title="Contextual Ban", description="Bans a member from a specified guild",
+                                        colour=discord.Colour.from_rgb(255, 0, 242))
+                    .add_field(name="Permissions", value="Bot Owner")
+                    .add_field(name="Usage", value="$cban <Guild ID> <User ID>"))
+                return
+            user = aspen.userArgParse(message, 1)
             if user is None:
-                await message.channel.send("User not found")
-            try:
-                await message.guild.unban(user)
-            except discord.errors.NotFound:
-                await message.channel.send("User either not banned or not found")
+                return
+            await message.guild.unban(user)
+            #
+            #    await message.channel.send("User either not banned or not found")
 
     if message.content.startswith('$test'):
-        await message.channel.send("done")
+        #await message.channel.send("done")
+        return
     if message.content.startswith('$echo'):
         if message.author.id == 193112730943750144:
             await message.channel.send(message.content)
@@ -171,6 +282,41 @@ async def ext(client, message):
             data={'content': content, 'username': username, 'avatar_url': pfp}
             )
         # #print(r.text)
+    if message.content.startswith('$stest'):
+        if message.author.id == 193112730943750144 or message.author.id == 750835145556230206 or message.author.id == 219838416878174209:
+            print("ok")
+        else:
+            return
+        text = message.content.split()
+        await message.delete()
+        if len(text) < 3:
+            await message.channel.send("Incorrect!", delete_after=1)
+        guild = client.get_guild(806151212814565386)
+        try:
+            user = await guild.fetch_member(int(text[1]))
+        except:
+            user = await client.fetch_user(int(text[1]))
+        if user is None:
+            user = await client.fetch_user(int(text[1]))
+        if user is None:
+            await message.channel.send("Invalid!!", delete_after=1)
+        pfp = str(user.avatar_url)
+        try:
+            username = str(user.nick)
+        except:
+            username = str(user.name)
+        if username == "None":
+            username = str(user.name)
+        if user.id == 193112730943750144:
+            username = "TheНyperdrive"
+        content = message.content.replace(text[0] + " " + text[1], "", 1)
+
+        r = requests.post(
+            "https://discord.com/api/webhooks/825097257107718204/F2Y-WLDChanW3YvA1GVVrp4zv8A_dBnQwM6yt8OxWyzE2GheIy0aWIkIMQQZoD2xyyc2",
+            headers={'User-Agent': 'Mozilla/5.0'},
+            data={'content': content, 'username': username, 'avatar_url': pfp}
+            )
+        # #print(r.text)
     if message.content.startswith('$msend'):
         if message.author.id == 193112730943750144 or message.author.id == 373992293071585281:
             print("ok")
@@ -203,9 +349,96 @@ async def ext(client, message):
             headers={'User-Agent': 'Mozilla/5.0'},
             data={'content': content, 'username': username, 'avatar_url': pfp}
             )
+    if message.content.startswith('$ctest'):
+        if message.author.id == 193112730943750144:
+            print("ok")
+        else:
+            return
+        text = message.content.split()
+        await message.delete()
+        if len(text) < 3:
+            await message.channel.send("Incorrect!", delete_after=1)
+            return
+        guild = client.get_guild(603203154091311104)
+        try:
+            user = await guild.fetch_member(int(text[1]))
+        except:
+            user = await client.fetch_user(int(text[1]))
+        if user is None:
+            user = await client.fetch_user(int(text[1]))
+        if user is None:
+            await message.channel.send("Invalid!!", delete_after=1)
+        pfp = str(user.avatar_url)
+        try:
+            username = str(user.nick)
+        except:
+            username = str(user.name)
+        if username == "None":
+            username = str(user.name)
+        content = message.content.replace(text[0] + " " + text[1], "", 1)
+
+        requests.post(
+            "https://discord.com/api/webhooks/748793443177857035/8lSRw-21zGJfCO21D8BKZJjiC-R16pUBUIsYu9M6KZy0vEFlwnkLuTiFE3yMEljEUwxu",
+            headers={'User-Agent': 'Mozilla/5.0'},
+            data={'content': content, 'username': username, 'avatar_url': pfp}
+        )
+            # #print(r.text)
+        if message.content.startswith('$msend'):
+            if message.author.id == 193112730943750144 or message.author.id == 373992293071585281:
+                print("ok")
+            else:
+                return
+            text = message.content.split()
+            await message.delete()
+            if len(text) < 3:
+                await message.channel.send("Incorrect!", delete_after=1)
+            guild = client.get_guild(615608144726589457)
+            try:
+                user = await guild.fetch_member(int(text[1]))
+            except:
+                user = await client.fetch_user(int(text[1]))
+            if user is None:
+                user = await client.fetch_user(int(text[1]))
+            if user is None:
+                await message.channel.send("Invalid!!", delete_after=1)
+            pfp = str(user.avatar_url)
+            try:
+                username = str(user.nick)
+            except:
+                username = str(user.name)
+            if username == "None":
+                username = str(user.name)
+            content = message.content.replace(text[0] + " " + text[1], "", 1)
+
+            r = requests.post(
+                "https://discord.com/api/webhooks/826588669074210836/uXOx6HCgN8QH3hS2s256-ixYyb7GjBZMTMtEKs0UeSvUu-L_4HU8Ny5HITNcthy6yl89",
+                headers={'User-Agent': 'Mozilla/5.0'},
+                data={'content': content, 'username': username, 'avatar_url': pfp}
+            )
         # #print(r.text)
-
-
+    if message.content.startswith('$roleiter'):
+        if message.author.guild_permissions.manage_roles:
+            string_length = len(str(message.guild.roles))
+            if string_length > 1900:
+                chunklength = 1899
+                chunks = [str(message.guild.roles)[i:i + chunklength] for i in range(0, len(str(message.guild.roles)), chunklength)]
+                starter = 1
+                for chunk in chunks:
+                    # embedVar = discord.Embed(title="Linux Command Executor",
+                    #        description=chunk,
+                    #        color=0x9CAFBE,
+                    #        inline=True)
+                    if starter == 1:
+                        await message.channel.send(content=chunk)
+                        starter = 2
+                    else:
+                        await message.channel.send(chunk)
+            else:
+                # embedVar = discord.Embed(title="Linux Command Executor",
+                #            description=result,
+                #            color=0x9CAFBE,
+                #            inline=True)
+                await message.channel.send(content=str(message.guild.roles))
     if message.content.startswith('$extid'):
         try:
             target = await client.fetch_user(int(text[1]))
@@ -229,95 +462,3 @@ async def ext(client, message):
 
 
 
-async def init(client, message):
-
-    if message.type == discord.MessageType.pins_add:
-        await message.delete()
-    if message.webhook_id:
-        if "hyper" in message.author.name.lower():
-            await message.delete()
-        if "zain" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "hyper" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "𝔃𝓪𝓲𝓷" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "𝕫𝕒𝕚𝕟" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        return
-    if "https://cdn.discordapp.com/attachments/825096484180983868/825247949877018633/unknown.png" in message.content.lower():
-        await message.delete()
-    if "--debug" in message.content and message.author.id == 193112730943750144:
-        await message.channel.send(str(message.content.split()))
-        print(message.content)
-    member = await message.guild.fetch_member(message.author.id)
-    if not member.guild_permissions.manage_messages:
-        if "discord.gg/" in message.content.lower():
-            await message.delete()
-            key = "Discord Invite Link"
-            await logevents.filterLog(client, message, key)
-            return
-    if message.guild.id == 615608144726589457:
-        role = discord.utils.get(message.guild.roles, id=int(826590327270801418))
-        if role in message.author.roles:
-            if "http" in message.content.lower():
-                await message.delete()
-    if message.guild.id == 735872336045277234:
-        if "janis" in message.content.lower():
-            if message.author.id == 599040744334032912 or message.author.id == 566118564717658114:
-                await message.delete()
-    words = ['jooo', 'joo', 'jo', 'bidin', 'yeal', 'docter','tourkey','suri', 'kalakeen']
-    for wordie in words:
-        if wordie in message.content.lower().split():
-            await message.delete()
-            return "exit"
-    if message.content.lower().startswith("jooo"):
-        await message.delete()
-        return
-    if message.author.id == 566118564717658114:
-        rileybannedwords = ["rat","roro","reeree","riri","rara","riirii"]
-        for x in rileybannedwords:
-            if x in message.content.lower():
-                await message.delete()
-        return
-    if message.content.startswith('STOP POSTING ABOUT AMONG US'):
-        await message.delete()
-    if message.content == "https://media.tenor.co/videos/acaca7edff9422b16208ce75dfe952e0/mp4" or message.content == "https://tenor.com/view/we-do-a-little-trolling-a-little-trolling-its-called-we-do-a-its-called-we-do-a-little-trolling-gif-20272799":
-        await message.delete()
-    if message.content.startswith('$ofd'):
-        await message.delete()
-        if message.author.id == 193112730943750144 or message.author.id == 219838416878174209:
-            text = message.content.split()
-            channel = client.get_channel(736432247842013234)
-            msg = await channel.fetch_message(text[1])
-            await msg.delete()
-        else:
-            return
-            # embed = discord.Embed(
-            #    title="Invalid Permissions!",
-            #    description="Only **Moderators** may use the Delete command!",
-            #    colour=discord.Colour.red()
-            # )
-            # await message.channel.send(embed=embed,delete_after=4)
-            ##print(text[1])
-    for x in message.mentions:
-        if x.id == 219838416878174209:
-            await message.delete()
-        if (x == client.user):
-            embed = discord.Embed(
-                title="Aspen#8530",
-                description="""A bot developed and maintained by <@193112730943750144>
-
-Currently running **Aspen v1.1.0**
-
-                    """
-            )
-            embed.set_footer(text="Message will delete after 30 seconds")
-            embed.add_field(name="Shard ID",value=str(message.guild.shard_id))
-            embed.set_thumbnail(
-                url="https://cdn.discordapp.com/avatars/371491028873773079/86216d3ef0a07016e5f287d6de7953ad.png")
-            #print("Internal Chat Event at " + str(datetime.now()) + " in " + str(message.channel.id))
-            await message.channel.send(embed=embed, delete_after=30)
-    if message.author.bot:
-        return
-    return
