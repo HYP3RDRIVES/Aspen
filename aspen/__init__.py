@@ -73,7 +73,15 @@ async def getChannel(client, message, type):
     return channel
 
 async def isOwner(message):
-    return
+    f = open("config.json")
+    config = Dict(json.load((f)))
+    # await message.channel.send(str(list(config["Contributors"].values())))
+    if message.author.id in list(config["Contributors"].values()):
+        if "--debug" in message.content.lower():
+            await message.channel.send("IsOwner=True")
+        return True
+    else:
+        return False
 
 async def isAdmin(message):
     return
@@ -81,25 +89,29 @@ async def isAdmin(message):
 async def isMod(message):
     return
 
-async def userArgParse(message, selector):
-    text = message.content.split()
+async def userArgParse(client, message, selector):
+    text = message.content.lower().split()
     replacer = text[0]
-    if message.content.replace(replacer, "", 1) == "":
+    if len(text) == 1:
         target = message.author.id
-    elif message.content.replace(replacer+" ", "", 1) == text[1]:
-        if text[selector].startswith('<@!') or text[selector].startswith('<@'):
-            target = text[selector].replace("<@", "", 1)
-            target = target.replace("!", "", 1)
-            target = target.replace(">", "", 1)
-        else:
-            try:
-                target = int(text[selector])
-            except:
-                await message.channel.send("Please ensure you used a User ID, or valid user mention.")
-                return None
+    elif text[selector].startswith('<@!') or text[selector].startswith('<@'):
+        target = text[selector].replace("<@", "", 1)
+        target = target.replace("!", "", 1)
+        target = target.replace(">", "", 1)
+    else:
+        try:
+            target = int(text[selector])
+        except:
+            await message.channel.send("Please ensure you used a User ID, or valid user mention.")
+            return None
     try:
-        target = await message.guild.fetch_member(target)
+        target = await client.fetch_user(int(target))
     except:
         await message.channel.send("Could not find user!")
         return None
+    try:
+        target = await message.guild.fetch_member(int(target.id))
+    except:
+        print("Not in guild")
+
     return target

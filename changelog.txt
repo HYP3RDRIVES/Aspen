@@ -1,4 +1,8 @@
+**== Version v1.1.1A ==**
+- [Apr/26/2021] - Fixed User Arg Parser
+- [Apr/26/2021] - $whois should stop crashing if the target has no roles
 **== Version v1.1.1 ==**
+- [Apr/17/2021] - Commands are no longer case sensitive
 - [Apr/16/2021] - Wildcard chat filter
 - [Apr/15/2021] - Refactor command processor
 - [Apr/14/2021] - Added more help info for commands
@@ -31,3 +35,7 @@
 - More intuitive Settings management system
 - Converting rest of the commands to the argument system
 - Consolidation of certain events into functions
+
+**== Notes ==**
+- Any changes to changelog, without version changes are
+   hot-patched updates, without a bot restart.
