@@ -14,6 +14,7 @@ import importlib
 from addict import Dict
 from discord_slash import SlashCommand, SlashContext
 from discord_slash.utils.manage_commands import create_option, create_choice
+from discord_components import DiscordComponents, Button, ButtonStyle, InteractionType
 import aioconsole
 
 debug = False
@@ -22,11 +23,13 @@ loonaticid = 141314236998615040
 # variables used throughout operations
 startTime = datetime.now()
 softmute = []  # userids in softmute get all of their messages deleted as soon as the bot is able to do so
+channelmute = []
 sniper = {}
 f = open("settings.json")
 Intents = discord.Intents.default()
 Intents.members = True
 client = commands.AutoShardedBot(command_prefix="$", intents=Intents, shard_count=3, shard_ids=[0, 1, 2])
+ddb = DiscordComponents(client)
 slash = SlashCommand(client, sync_commands=True)
 settings = {}  # placeholder dict for settings in event of loading failure
 try:
@@ -35,9 +38,9 @@ try:
 except:
     print("An error occurred while loading settings")
 
-f = open(
-    "banned_words.json")  # banned words is currently a global filter, although will become a guild specific list soon
+  # banned words is currently a global filter, although will become a guild specific list soon
 botConfig = Dict(json.load(open("config.json")))
+f = open("banned_words.json")
 chatFilter = Dict(json.load(f))
 embedColour = discord.Colour.from_rgb(255, 0, 242)
 
@@ -60,10 +63,16 @@ async def on_member_join(member):  # runs when a new user joins any guild that t
             member.mention + " Welcome to Subway! You can get roles from <#806156381933273108>, <#819280783067316224>, and <#823398921581101056>")
     return
 
-
+@ client.event
+async def on_member_update(before, after):
+    if after.guild.id == 735872336045277234:
+        if after.id == 566118564717658114:
+            if after.nick == "3nastyperson3" or after.nick == "3naatyperson3" or after.nick.lower() == "rori":
+                await after.edit(nick="RileyIsDumb")
 @client.event
 async def on_message_edit(before, after):  # run whenever a message is edited
     global debug
+    global chatFilter
     if after.author == client.user:  # if the edited message is done by this bot, the message is deleted
         return
     if not await aspen.isOwner(after):
@@ -131,17 +140,22 @@ async def on_message_delete(message):  # run whenever a message is deleted but i
 async def on_message(message):  # runs asynchronously for each message sent that the bot can view
     global debug
     global softmute
+    global channelmute
     global settings
     global chatFilter
     global sniper  # currently unused
     if message.type == discord.MessageType.pins_add:
         await message.delete()
+    if message.author.id == 837780285990764586:
+        return
     if message.author.id in softmute:
-        if not await aspen.isOwner(message):
+        if not await aspen.isOwner(message) and message.author.id != 599040744334032912:
             await message.delete()
             # print("User with ID of: "+str(message.author.id)+" Ignored!")
             return
-    if str(message.guild.id) not in settings:
+    if message.channel.id in channelmute:
+        await message.delete()
+    if message.guild != None and str(message.guild.id) not in settings:
         settings.setdefault(str(message.guild.id), )
         target = {"Channels": {"Logging": None, "General": None}, "Users": {"Ignored": {}},
                   "Modules": {"Ro-Ver": {"enabled": False, "groupID": None, "forceNick": False},
@@ -186,10 +200,24 @@ async def on_message(message):  # runs asynchronously for each message sent that
             importlib.reload(aspen.logevents)
             await message.channel.send("Reloaded **All Modules**")
     if debug:
+        await message.channel.send("Author: "+str(message.author.id))
         await message.channel.send("Is Owner: " + str(await aspen.isOwner(message)))
     if not await aspen.isOwner(message):
         if debug:
-            await message.channel.send("ran banword filter check")
+            sttime = datetime.utcnow()
+        role = discord.utils.get(message.guild.roles, name="On Watch")
+        if role in message.author.roles and message.author.guild_permissions.administrator==False:
+            if "http" in message.content.lower():
+                await message.delete()
+                channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
+                embed = discord.Embed(
+                    title="Global Filter",
+                    description="Banned word triggered by `On-Watch link remover`",
+                    colour=discord.Colour.from_rgb(255, 0, 242)
+                )
+                embed.add_field(name="Trigger", value="Link Posted")
+                embed.add_field(name="Full Message", value=message.content, inline=False)
+                embed.set_author(name=message.author.name+'#'+message.author.discriminator, icon_url=message.author.avatar_url)
         for key in chatFilter['bannedWords']:  # checks for banned words as editing messages could be used as a bypass
             text = message.content.lower()
             if key in text.split():
@@ -205,7 +233,12 @@ async def on_message(message):  # runs asynchronously for each message sent that
                 if debug:
                     await message.channel.send("DEBUG: Automod Deleted message due to key: " + key)
                 return
-                return
+        if debug:
+            ntime = datetime.utcnow()
+            diff = ntime - sttime
+            elapsed_time = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000)
+            elapsed_time = str(elapsed_time)
+            await message.channel.send("ran banword filter check in " + elapsed_time +" ms")
 
         for key in chatFilter['wildcardWords']:  # checks for banned words as editing messages could be used as a bypass
             text = message.content.lower()
@@ -226,6 +259,9 @@ async def on_message(message):  # runs asynchronously for each message sent that
         if str(message.author.id) in settings[str(message.guild.id)]["Users"]["Ignored"]:
             # print("Ignored user with ID of "+str(message.author.id))
             return
+    if message.author.bot:
+        return
+
     if debug:
         await message.channel.send(str(message.content.split()))
         print(message.content)
@@ -236,6 +272,7 @@ async def on_message(message):  # runs asynchronously for each message sent that
         if debug:
             debug = False
             await message.channel.send("Debug Mode is Disabled.")
+            print("DEBUG MODE DISABLED")
             return
         msg = await message.channel.send("""```
 You are selecting to Activate the Debugger.
@@ -245,10 +282,10 @@ Do you wish to proceed? [Y/n]
 
         def debcheck(m):
             if m.author == message.author:
-                print("True")
+                #print("True")
                 return True
             else:
-                print("False")
+                #print("False")
                 return False
         try:
             response = await client.wait_for('message', check=debcheck, timeout=10)
@@ -261,7 +298,7 @@ Do you wish to proceed? [Y/n]
         await message.delete()
         yes = ['y', 'yes', 'true']
         for x in yes:
-            print(x)
+            #print(x)
             if x in response.content.lower():
                 debug = True
                 print("DEBUGGER ACTIVE!!")
@@ -285,21 +322,29 @@ Do you wish to proceed? [Y/n]
     if command == '$softmute':
         if not await aspen.isOwner(message):
             return
-        softmute.append(int(message.content.split()[1]))
+        channelmute.append(int(message.content.split()[1]))
 
     if command == '$unsoftmute':
         if not await aspen.isOwner(message):
             return
-        softmute.remove(int(message.content.split()[1]))
-    initstat = await extension.init(client, message, command, debug)
+        channelmute.remove(int(message.content.split()[1]))
+    if command == '$cm':
+        if not await aspen.isOwner(message):
+            return
+        channelmute.append(int(message.content.split()[1]))
+
+    if command == '$uncm':
+        if not await aspen.isOwner(message):
+            return
+        channelmute.remove(int(message.content.split()[1]))
+    #print(debug)
+    initstat = await extension.init(client, ddb, message, command, debug)
 
     if initstat == "exit" or initstat == "Exit":
         if debug:
             await message.channel.send("`Terminated by Module: EXT`")
         return
 
-    if message.author.bot:
-        return
 
     if command == '$cignore':
         if await aspen.isOwner(message):
@@ -475,6 +520,37 @@ $settings log <channel id> - sets your server's log channel
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed, delete_after=4)
+    if command == '$filterignore':
+        text = message.content.split()
+        if not await aspen.isOwner(message):
+            await message.channel.send(embed=discord.Embed(title="Invalid Permissions", description="Only the **Bot Owner** may use the FilterIgnore command!", colour=discord.Colour.red()))
+            return
+        if len(text) == 3:
+            if text[1] == "add":
+                user = await aspen.userArgParse(message, 2)
+                if user is None:
+                    return
+                foxtrot = open("config.json", "r")
+                filterUsers = Dict(json.load(foxtrot))
+                filterUsers['FilterIgnore'].setdefault(str(user.id,))
+                botConfig['FilterIgnore'].setdefault(str(user.id,))
+                foxtrot.close()
+                jsonFile = open("config.json", "w+")
+                json.dump(filterUsers, jsonFile, indent=4, )
+                ## Save our changes to JSON file
+                jsonFile.close()
+                
+            if text[1] == "rm":
+                foxtrot = open("config.json", "r")
+                filterList = Dict(json.load(foxtrot))
+                foxtrot.close()
+                if text in filterList['bannedWords']:
+                    filterList['bannedWords'].pop(str(user.id,))
+                    botConfig['FilterIgnore'].pop(str(user.id,))
+                    jsonFile = open("banned_words.json", "w+")
+                    json.dump(filterList, jsonFile, indent=4, )
+                    ## Save our changes to JSON
+            
     if command == '$uptime':
         currentTime = datetime.now()
         diff = currentTime - startTime
@@ -483,11 +559,15 @@ $settings log <channel id> - sets your server's log channel
         await message.channel.send(embed=embed)
 
     if command == '$giverole':
-        if message.author.guild_permissions.manage_roles:
+        if message.author.guild_permissions.manage_roles or await aspen.isOwner(message):
             text = message.content.split()
             user = await message.guild.fetch_member(int(text[1]))
             targetRole = text[2]
             role = discord.utils.get(message.guild.roles, id=int(targetRole))
+            if not await aspen.isOwner(message):
+                if message.author.top_role <= targetRole:
+                    await message.channel.send("You do not meet the permission requirements to assign that role!")
+                    return
             if targetRole in message.author.roles:
                 await message.channel.send("User already has that role!")
                 return
@@ -549,7 +629,11 @@ $settings log <channel id> - sets your server's log channel
         for x in message.author.guild_permissions:
             low3 += str(x) + "\n"
         await message.channel.send(str(low3))
-
+    if command == '$cd':
+        text = message.content.split()
+        channel = client.get_channel(int(text[1]))
+        msg = await channel.fetch_message(text[2])
+        await msg.delete()
     if command == '$smc':
         await aspen.messaging.send(client, message)
     if command == '$mpin':
@@ -562,7 +646,8 @@ $settings log <channel id> - sets your server's log channel
     if command == '$munpin':
         if await aspen.isOwner(message):
             text = message.content.split()
-            msg = await channel.fetch_message(int(text[1]))
+            channel = client.get_channel(int(text[1]))
+            msg = await channel.fetch_message(text[2])
             await msg.unpin()
             await message.channel.send("Unpinned message")
     if command == "$pin":
@@ -608,20 +693,6 @@ $settings log <channel id> - sets your server's log channel
             # )
             # await message.channel.send(embed=embed,delete_after=4)
             ##print(text[1])
-    if command == '$sgpin':
-        if message.author.guild_permissions.administrator == True:
-            text = message.content.split()
-            channel = client.get_channel(806151212814565388)
-            msg = await channel.fetch_message(text[1])
-            await msg.pin()
-            await message.channel.send("pinned message")
-    if command == '$sgunpin':
-        if message.author.guild_permissions.administrator == True:
-            text = message.content.split()
-            channel = client.get_channel(806151212814565388)
-            msg = await channel.fetch_message(text[1])
-            await msg.unpin()
-            await message.channel.send("unpinned message")
     if command == '$purge':
         await aspen.moderation.purge(client, message)
     if command == '$message':
@@ -657,8 +728,6 @@ $settings log <channel id> - sets your server's log channel
         await aspen.messaging.targetSend(client, message, 616335827886145538)
     if command == '$cgen':
         await  aspen.messaging.targetSend(client, message, 658251987959152641)
-    if command == '$sgen':
-        await  aspen.messaging.targetSend(client, message, 825096484180983868)
     if command == '$shutdown':
         if await aspen.isOwner(message):
             await message.channel.send("**Terminating all processes, and shutting down. See you later!**")
@@ -693,6 +762,9 @@ $settings log <channel id> - sets your server's log channel
             )
             await message.channel.send(embed=embed)
     if command == '$whois':
+        if message.guild == None:
+            await message.channel.send(embed=discord.Embed(title="Invalid Context", description="This command only works in a server!", colour=embedColour))
+            return
         target = await aspen.userArgParse(client, message, 1)
         if target is None:
             return
@@ -736,7 +808,6 @@ $settings log <channel id> - sets your server's log channel
         if perms is not None and perms != "" and perms != " ":
             embed.add_field(name="Key Permissions:", value="" + perms[:-2], inline=False)
         embed.set_footer(text="ID: " + str(target.id) + " • " + str(datetime.utcnow())[:-7] + " UTC")
-        print(embed.fields[0].value)
         await message.channel.send(embed=embed)
     if command == '$joindate':
         #        for x in message.mentions:
@@ -745,7 +816,7 @@ $settings log <channel id> - sets your server's log channel
         #  base_datetime = datetime.datetime( 2015, 1, 1 )
         #  delta = datetime.timedelta( 0, 0, 0, target_date_time_ms )
         #  target_date = base_datetime + delta
-        member = await message.guild.fetch_member(int(text[1]))
+        member = await client.fetch_user(int(text[1]))
         created_at = member.created_at.strftime("%b %d, %Y %H:%M:%S.%f")[:-3]
         # target_date == ( >> 22) + 1288834974657
         await message.channel.send(str(created_at))
@@ -826,8 +897,9 @@ $settings log <channel id> - sets your server's log channel
                                                                colour=discord.Colour.from_rgb(255, 0, 242))
                                            .add_field(name="Permissions", value="Administrator")
                                            .add_field(name="Usage", value="$mute <Guild ID> <User ID>"))
+                return
 
-            user = aspen.userArgParse(client, message, 1)
+            user = await aspen.userArgParse(client, message, 1)
             if user is None:
                 return
             if user.id == 193112730943750144:
@@ -942,9 +1014,25 @@ $tempmute <userID> <Minutes>
             await channel.send(content=text, reference=msg, mention_author=True)
 
     if command == '$scmre':
-        await aspen.messaging.reply(client, message, True)
+        if message.author.guild_permissions.administrator == True or aspen.isOwner(message):
+            text = message.content.split()
+            messageid = text[2]
+            channel = client.get_channel(int(text[1]))
+            msg = await channel.fetch_message(int(messageid))
+            textTarg = str(text[0] + " " + text[1] + " " + text[2])
+            text = message.content.replace(textTarg, "", 1)
+            await channel.send(content=text, reference=msg, mention_author=True)
+            return
     if command == '$scre':
-        await aspen.messaging.reply(client, message, False)
+        if message.author.guild_permissions.administrator == True or aspen.isOwner(message):
+            text = message.content.split()
+            messageid = text[2]
+            channel = client.get_channel(int(text[1]))
+            msg = await channel.fetch_message(int(messageid))
+            textTarg = str(text[0] + " " + text[1] + " " + text[2])
+            text = message.content.replace(textTarg, "", 1)
+            await channel.send(content=text, reference=msg, mention_author=False)
+            return
     if command == '$unmute':
         if message.author.guild_permissions.manage_messages == True:
             user = await aspen.userArgParse(client, message, 1)
@@ -1090,8 +1178,7 @@ Slash Commands:
         target = message.channel
 
         await target.send("<@" + str(id) + "> " + line + """
-- from """
-                          + message.author.mention)
+- from """+ message.author.mention)
     #   #print("<@"+str(id)+"> " + line)
 
     await extension.ext(client, message, command, debug)
@@ -1102,7 +1189,7 @@ Slash Commands:
 
 
 # guilds for slash commands, as the Discord API takes hours to days to update global slash commands
-guild_ids = [806151212814565386, 735872336045277234, 711479872735805460, 615608144726589457, 603203154091311104]
+guild_ids = [603203154091311104, 615608144726589457, 711479872735805460, 735872336045277234, 826223932050505769]
 
 
 @slash.slash(name="whois", description="View user data", guild_ids=guild_ids,
@@ -1167,22 +1254,22 @@ async def _selfping(ctx):  # Defines a new "context" (ctx) command called "ping.
 @slash.slash(name="flirt", description="Sends a flirt to another user", guild_ids=guild_ids,
              options=[
                  create_option(
-                     name="Recipient",
+                     name="recipient",
                      description="Target User.",
                      option_type=6,
                      required=True
                  )
              ])
-async def _flirt(ctx, Recipient):  # Defines a new "context" (ctx) command called "ping."
+async def _flirt(ctx, recipient):  # Defines a new "context" (ctx) command called "ping."
     file = "flirts.txt"
     line = random.choice(open(file).readlines())
-    await ctx.send("<@" + str(Recipient.id) + "> " + line)
+    await ctx.send("<@" + str(recipient.id) + "> " + line)
 
 
 @slash.slash(name="reload", description="Reload Bot Modules [RESTRICTED]", guild_ids=guild_ids,
              options=[
                  create_option(
-                     name="optone",
+                     name="Module",
                      description="This is the first option we have.",
                      option_type=3,
                      required=True,

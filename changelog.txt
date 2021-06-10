@@ -1,4 +1,6 @@
 **== Version v1.1.1A ==**
+- [May/17/2021] - Patched On Watch chat filter
+- [May/04/2021] - Patched Permissions Check on certain commands.
 - [Apr/26/2021] - Fixed User Arg Parser
 - [Apr/26/2021] - $whois should stop crashing if the target has no roles
 **== Version v1.1.1 ==**

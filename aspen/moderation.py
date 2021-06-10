@@ -10,6 +10,7 @@ async def purge(client, message):
                                                                colour=discord.Colour.from_rgb(255, 0, 242))
                                            .add_field(name="Permissions", value="Administrator")
                                            .add_field(name="Usage", value="$purge <# of messages>"))
+            return
         await message.delete()
         await message.channel.purge(limit=int(text[1]))
         stringy = text+" Messages deleted in <#"+str(message.channel.id)+">"

@@ -5,94 +5,27 @@ from datetime import datetime
 import resource
 import requests
 import asyncio
-rexpingcount = 1
-async def init(client, message, command, debugstate):
-    global rexpingcount
-#    if message.guild.id == 735872336045277234 and message.author.id != 193112730943750144:
-#        await message.delete()
-    words = ['jooo', 'joo', 'jo', 'bidin', 'yeal', 'docter','tourkey','suri', 'kalakeen']
-    for wordie in words:
-        if wordie in message.content.lower().split():
-            await message.delete()
-            return "exit"
-    if message.content.lower().startswith("jooo"):
-        await message.delete()
-        return
+from discord_components import DiscordComponents, Button, ButtonStyle, InteractionType
 
-    if message.author.id == 193112730943750144:
-        if "This is a legal message to confirm to the public that may find my previous messages that may contain the words “simp”, or may indicate that I could be a simp, that I am not in fact a simp. Everything I say is for jokes and jokes only, therefore I am not a simp in any way, shape or form. Also to note, I am presently not dating anyone online. Anything I say that could possibly indicate that I am dating someone presently is to be automatically invalidated, and is used for jokes and jokes only." in message.content:
-            await message.delete()
-    if message.webhook_id and message.guild.id == 806151212814565386:
-        if "zain" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "hyper" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "𝔃𝓪𝓲𝓷" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        if "𝕫𝕒𝕚𝕟" in message.content.lower() and message.guild.id == 806151212814565386:
-            await message.delete()
-        return
-    if message.author.id == 705075850655039568:
-        for x in message.mentions:
-            if x.id == 750835145556230206:
-                await message.delete()
-                role = discord.utils.get(message.guild.roles, name="Muted")
-                await message.author.add_roles(role)
-                await message.channel.send("<@705075850655039568> You pinged Tristin, you may not speak for"+str(rexpingcount*30)+" Seconds")
-                await asyncio.sleep(30*rexpingcount)
-                rexpingcount = rexpingcount+1
-                await message.author.remove_roles(role)
+async def init(client, ddb, message, command, debugstate):
+    if message.guild != None:
+        member = await message.guild.fetch_member(message.author.id)
+        if not member.guild_permissions.manage_messages:
+            for x in ["discord.gg/", "discord.com/invite", "discordapp.com/invite", "watchanimeattheoffice.com/invite", "discord.co/invite"]:
+                if x in message.content.lower():
+                    await message.delete()
+                    key = "Discord Invite Link"
+                    await logevents.filterLog(client, message, key)
+                    return
 
-    if "https://cdn.discordapp.com/attachments/825096484180983868/825247949877018633/unknown.png" in message.content.lower():
-        await message.delete()
-    member = await message.guild.fetch_member(message.author.id)
-    if not member.guild_permissions.manage_messages:
-        for x in ["discord.gg/", "discord.com/invite", "discordapp.com/invite", "watchanimeattheoffice.com/invite", "discord.co/invite"]:
-            if x in message.content.lower():
-                await message.delete()
-                key = "Discord Invite Link"
-                await logevents.filterLog(client, message, key)
-                return
-    if message.author==client.user:
+    if message.author == client.user:
         return
     if message.author.bot:
         return
-    if message.guild.id == 615608144726589457:
-        role = discord.utils.get(message.guild.roles, id=int(826590327270801418))
-        if role in message.author.roles:
-            if "http" in message.content.lower():
-                await message.delete()
-    if message.guild.id == 735872336045277234:
-        if "janis" in message.content.lower():
-            if message.author.id == 599040744334032912 or message.author.id == 566118564717658114:
-                await message.delete()
 
-    if message.author.id == 566118564717658114:
-        rileybannedwords = ["rat","roro","reeree","riri","rara","riirii"]
-        for x in rileybannedwords:
-            if x in message.content.lower():
-                await message.delete()
-        return
-    if message.content.startswith('STOP POSTING ABOUT AMONG US'):
-        await message.delete()
-    if message.content == "https://media.tenor.co/videos/acaca7edff9422b16208ce75dfe952e0/mp4" or message.content == "https://tenor.com/view/we-do-a-little-trolling-a-little-trolling-its-called-we-do-a-its-called-we-do-a-little-trolling-gif-20272799":
-        await message.delete()
-    if command == "$ofd":
-        await message.delete()
-        if message.author.id == 193112730943750144 or message.author.id == 219838416878174209:
-            text = message.content.split()
-            channel = client.get_channel(736432247842013234)
-            msg = await channel.fetch_message(text[1])
-            await msg.delete()
-        else:
-            return
-            # embed = discord.Embed(
-            #    title="Invalid Permissions!",
-            #    description="Only **Moderators** may use the Delete command!",
-            #    colour=discord.Colour.red()
-            # )
-            # await message.channel.send(embed=embed,delete_after=4)
-            ##print(text[1])
+    if command == "!call" and message.guild.id == 735872336045277234:
+        await client.get_channel(758729070111490109).send("@everyone Call from: "+message.author.name+"#"+message.author.discriminator+" at "+str(message.jump_url))
+        await message.channel.send("Moderator call. Please standby.")
     for x in message.mentions:
         if x == client.user:
             embed = discord.Embed(
@@ -104,12 +37,19 @@ async def init(client, message, command, debugstate):
                         """
             )
             embed.set_footer(text="Message will delete after 30 seconds")
-            embed.add_field(name="Shard ID", value=str(message.guild.shard_id))
+            if message.guild != None:
+                embed.add_field(name="Shard ID", value=str(message.guild.shard_id))
             embed.set_thumbnail(
                 url="https://cdn.discordapp.com/avatars/371491028873773079/86216d3ef0a07016e5f287d6de7953ad.png")
             # print("Internal Chat Event at " + str(datetime.now()) + " in " + str(message.channel.id))
-            await message.channel.send(embed=embed, delete_after=30)
-
+            msg = await message.channel.send(embed=embed, delete_after=30, components=[Button(style=ButtonStyle.red, label="Action")])
+            res = await ddb.wait_for_interact("button_click")
+            if res.channel == msg.channel:
+                await res.respond(
+                    type=InteractionType.ChannelMessageWithSource,
+                    content=f'{res.component.label} clicked'
+                )
+            await msg.edit(embed=embed, components=[Button(style=ButtonStyle.red, label="Clicked")])
     return
 
 
@@ -120,13 +60,14 @@ async def ext(client, message, command, debugstate):
     if command == "$ping":
         await aspen.ping(client, message)
     if command == "$av":
-        if message.content.split()[1] == "help":
-            await message.channel.send(
+        if len(text) == 2:
+            if text[1] == "help":
+                await message.channel.send(
                 embed=discord.Embed(title="Avatar", description="Displays the Avatar of a selected user",
                                     colour=discord.Colour.from_rgb(255, 0, 242))
                 .add_field(name="Permissions", value="Everyone")
                 .add_field(name="Usage", value="$av <User>"))
-            return
+                return
         target = await aspen.userArgParse(client,  message, 1)
         if target is None:
             return
@@ -184,10 +125,14 @@ async def ext(client, message, command, debugstate):
 
 
             user = await aspen.userArgParse(client,  message, 1)
-
+            if message.guild.get_member(user.id) is not None:
+                if not await aspen.isOwner(message):
+                    if message.author.top_role <= user.top_role:
+                        await message.channel.send("You do not meet the permission requirements to assign that role!")
+                        return
             if user is None:
                 return "Exit"
-            if user.id == 193112730943750144:
+            if user.id == 193112730943750144 and await aspen.isOwner(message):
                 if "--force" in message.content.lower():
                     print("banning bot owner")
                 else:
@@ -214,14 +159,29 @@ async def ext(client, message, command, debugstate):
             guild = client.get_guild(int(text[1]))
             await guild.ban(user=user,delete_message_days=0)
             await message.channel.send(embed=discord.Embed(title="User Banned!",description="Banned "+user.name+"#"+user.discriminator,colour=discord.Colour.red()))
-
+    if command == '$cunban':
+        if aspen.isOwner(message):
+            if len(text) == 1:
+                await message.channel.send(embed=discord.Embed(title="Contextual Unan", description="Unans a member from a specified guild",
+                                                               colour=discord.Colour.from_rgb(255, 0, 242))
+                                           .add_field(name="Permissions", value="Bot Owner")
+                                           .add_field(name="Usage", value="$cunban <Guild ID> <User ID>"))
+                return
+            user = await aspen.userArgParse(client,  message, 2)
+            if user is None:
+                return
+            guild = client.get_guild(int(text[1]))
+            await guild.unban(user)
+            await message.channel.send(embed=discord.Embed(title="User Unanned!",description="Unanned "+user.name+"#"+user.discriminator))
+        else:
+            return
     if command == '$unban':
         if message.author.guild_permissions.ban_members:
             if len(text) == 1:
                 await message.channel.send(
                     embed=discord.Embed(title="Unban", description="Unbans a user from this guild",
                                         colour=discord.Colour.from_rgb(255, 0, 242))
-                    .add_field(name="Permissions", value="Ban Users")
+                    .add_field(name="Permissions", value="Ban Members")
                     .add_field(name="Usage", value="$unban <User ID>"))
                 return
             user = await aspen.userArgParse(client,  message, 1)
@@ -231,7 +191,15 @@ async def ext(client, message, command, debugstate):
             await message.channel.send("Unbanned "+user.name+"#"+user.discriminator)
             #
             #    await message.channel.send("User either not banned or not found")
-
+    if command == "$ofd":
+        await message.delete()
+        if message.author.id == 193112730943750144 or message.author.id == 219838416878174209:
+            text = message.content.split()
+            channel = client.get_channel(736432247842013234)
+            msg = await channel.fetch_message(text[1])
+            await msg.delete()
+        else:
+            return
     if command == '$test':
         #await message.channel.send("done")
         return "exit"
@@ -262,7 +230,7 @@ async def ext(client, message, command, debugstate):
             .set_image(url=file['url'])
         await msg.edit(embed=embed, content="\u2000")
     if command == '$btest':
-        if message.author.id == 193112730943750144 or message.author.id == 750835145556230206 or message.author.id == 219838416878174209:
+        if message.author.id != 19311273094375014:
             print("ok")
         else:
             return
@@ -363,6 +331,10 @@ async def ext(client, message, command, debugstate):
             headers={'User-Agent': 'Mozilla/5.0'},
             data={'content': content, 'username': username, 'avatar_url': pfp}
             )
+
+    if command == '$cpurge':
+        channel = client.get_channel(int(text[1]))
+        await channel.purge(limit=int(text[2]))
     if command == '$ctest':
         if message.author.id == 193112730943750144:
             print("ok")
@@ -430,6 +402,10 @@ async def ext(client, message, command, debugstate):
                 data={'content': content, 'username': username, 'avatar_url': pfp}
             )
         # #print(r.text)
+    if command == '$timein':
+        text = message.content.split()
+        if len(text) != 2:
+            await message.channel.send(embed=discord.Embed(title=""))
     if command == '$roleiter':
         if message.author.guild_permissions.manage_roles:
             string_length = len(str(message.guild.roles))
