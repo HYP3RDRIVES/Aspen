@@ -101,6 +101,10 @@ async def userArgParse(client, message, selector):
     else:
         try:
             target = int(text[selector])
+            if len(str(target)) > 18 and len(str(target)) < 17:
+                await message.channel.send("Please ensure you used a User ID, or valid user mention.")
+                return None
+
         except:
             await message.channel.send("Please ensure you used a User ID, or valid user mention.")
             return None
