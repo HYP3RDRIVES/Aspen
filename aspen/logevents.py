@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 import subprocess
 import aspen
+embedColour = discord.Colour.from_rgb(255, 0, 242)
+
 try:
     f = open("settings.json")
     settings = Dict(json.load(f))
@@ -31,7 +33,7 @@ async def internalEventLog(client, guild, user, action, string=None):
     settings = Dict(json.load(f))
     if string is None:
         string = "\u200b"
-    embed = discord.Embed(title=action,description=string)
+    embed = discord.Embed(title=action,description=string, colour=embedColour)
     embed.set_author(name=user.name+"#"+user.discriminator, icon_url=user.avatar_url)
     channelid = settings[str(guild)]["Channels"]["Logging"]
     channel = client.get_channel(int(channelid))
@@ -43,7 +45,7 @@ async def deleteLog(client, message):
 
     f = open("settings.json")
     settings = Dict(json.load(f))
-    embed = discord.Embed(colour=discord.Colour.red())
+    embed = discord.Embed(colour=discord.Colour.red(), description=str(message.content))
     try:
         targetLoc = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")+"_"+message.attachments[0].filename
         action = "sudo wget "+message.attachments[0].proxy_url+" -O /var/www/file-share/1/discord-del/"+targetLoc
@@ -58,7 +60,7 @@ async def deleteLog(client, message):
         embed.add_field(name="Location", value="[File](https://deleted.hypr.ax/" + targetLoc, inline=False)
         # print(targetLoc)
 
-    embed.add_field(name="\u200b", value="**Message sent by <@"+str(message.author.id)+"> deleted in <#"+str(message.channel.id)+">** \n"+str(message.content))
+    embed.add_field(name="\u200b", value="**Message sent by <@"+str(message.author.id)+"> deleted in <#"+str(message.channel.id)+">**")
     embed.set_author(name=message.author.name+'#'+message.author.discriminator, icon_url=message.author.avatar_url)
     embed.set_footer(text="Author ID: "+str(message.author.id)+" Message ID: "+str(message.id)+" Timestamp: "+str(datetime.utcnow()))
     channel = settings[str(message.guild.id)]["Channels"]["Logging"]

@@ -1,21 +1,22 @@
-import discord
-import subprocess
-import requests
-from discord.ext import commands
-import random
-import os
-from datetime import datetime
-import sys
 import asyncio
+import importlib
 import json
+import os
+import random
+import subprocess
+import sys
+from datetime import datetime
+
+import aioconsole
+import discord
+import requests
+from addict import Dict
+from discord.ext import commands
+from discord_slash import SlashCommand
+from discord_slash.utils.manage_commands import create_option, create_choice
+
 import aspen
 from aspen import moderation, messaging, logevents, extension
-import importlib
-from addict import Dict
-from discord_slash import SlashCommand, SlashContext
-from discord_slash.utils.manage_commands import create_option, create_choice
-from discord_components import DiscordComponents, Button, ButtonStyle, InteractionType
-import aioconsole
 
 debug = False
 hyperid = 193112730943750144
@@ -24,12 +25,13 @@ loonaticid = 141314236998615040
 startTime = datetime.now()
 softmute = []  # userids in softmute get all of their messages deleted as soon as the bot is able to do so
 channelmute = []
+holder = []
 sniper = {}
 f = open("settings.json")
 Intents = discord.Intents.default()
 Intents.members = True
-client = commands.AutoShardedBot(command_prefix="$", intents=Intents, shard_count=3, shard_ids=[0, 1, 2])
-ddb = DiscordComponents(client)
+# client = commands.AutoShardedBot(command_prefix="$", intents=Intents, shard_count=3, shard_ids=[0, 1, 2])
+client = commands.Bot(command_prefix="$", intents=Intents)
 slash = SlashCommand(client, sync_commands=True)
 settings = {}  # placeholder dict for settings in event of loading failure
 try:
@@ -40,10 +42,15 @@ except:
 
   # banned words is currently a global filter, although will become a guild specific list soon
 botConfig = Dict(json.load(open("config.json")))
-f = open("banned_words.json")
-chatFilter = Dict(json.load(f))
 embedColour = discord.Colour.from_rgb(255, 0, 242)
 
+
+@client.event
+async def on_disconnect():
+    print('Bot has disconnected')
+    os._exit(1)
+    raise Exception("Bot failure")
+    print("if you see this, the reload is broken")
 
 @client.event
 async def on_ready():  # run when all of the shards have logged in and connected
@@ -57,18 +64,17 @@ async def on_member_join(member):  # runs when a new user joins any guild that t
     global debug
     if member.bot:
         return
-    if member.guild.id == 806151212814565386:  # Guild ID for Ebin's subway
-        channel = client.get_channel(825096484180983868)  # General channel for Ebin's Subway
-        await channel.send(
-            member.mention + " Welcome to Subway! You can get roles from <#806156381933273108>, <#819280783067316224>, and <#823398921581101056>")
+    if settings[str(member.guild.id)]["Modules"]["Welcome"]["enabled"]:
+        channel = client.get_channel(int(settings[str(member.guild.id)]["Modules"]["Welcome"]["channel_id"]))
+        content = str(settings[str(member.guild.id)]["Modules"]["Welcome"]["content"])
+        if "{{user.mention}}" in content.lower():
+            content = content.replace("{{user.mention}}", member.mention)
+        await channel.send(content)
     return
 
 @ client.event
 async def on_member_update(before, after):
-    if after.guild.id == 735872336045277234:
-        if after.id == 566118564717658114:
-            if after.nick == "3nastyperson3" or after.nick == "3naatyperson3" or after.nick.lower() == "rori":
-                await after.edit(nick="RileyIsDumb")
+    return
 @client.event
 async def on_message_edit(before, after):  # run whenever a message is edited
     global debug
@@ -79,25 +85,25 @@ async def on_message_edit(before, after):  # run whenever a message is edited
         if "discord.gg/" in after.content:  # need to add a guild setting check, which will allow guild admins to disable
             if not after.author.guild_permissions.manage_messages:
                 await after.delete()
-        for key in chatFilter['bannedWords']:  # checks for banned words as editing messages could be used as a bypass
+        for key in settings[str(after.guild.id)]["Modules"]["ChatFilter"]["BannedWords"]:  # checks for banned words as editing messages could be used as a bypass
             text = after.content.lower()
             if key in text.split() and not (after.author.id == hyperid or after.author.id == loonaticid):
+                holder.append(after.id)
                 await after.delete()
-                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match`",
+                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match \n"+after.content,
                                       colour=discord.Colour.from_rgb(255, 0, 242))
                 embed.add_field(name="Banned Word", value=key)
-                embed.add_field(name="Full Message", value=after.content, inline=False)
                 embed.set_author(name=after.author.name + '#' + after.author.discriminator,
                                  icon_url=after.author.avatar_url)
                 channel = client.get_channel(int(settings[str(after.guild.id)]["Channels"]["Logging"]))
                 await channel.send(embed=embed)
-        for key in chatFilter['wildcardWords']:  # checks for banned words as editing messages could be used as a bypass
+        for key in settings[str(after.guild.id)]["Modules"]["ChatFilter"]["Wildcard"]:  # checks for banned words as editing messages could be used as a bypass
             if key in after.content.lower() and not await aspen.isOwner(after):
+                holder.append(after.id)
                 await after.delete()
-                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`",
+                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard` \n"+after.content,
                                       colour=discord.Colour.from_rgb(255, 0, 242))
                 embed.add_field(name="Banned Word", value=key)
-                embed.add_field(name="Full Message", value=after.content, inline=False)
                 embed.set_author(name=after.author.name + '#' + after.author.discriminator,
                                  icon_url=after.author.avatar_url)
                 channel = client.get_channel(int(settings[str(after.guild.id)]["Channels"]["Logging"]))
@@ -110,21 +116,9 @@ async def on_message_delete(message):  # run whenever a message is deleted but i
     global sniper  # currently unused
     if message.author.id in softmute:
         return
-    if message.content.startswith(
-            """Tristin: You wouldn't believe what happened to me today. My furry girlfriend today didn't want to have sex with me...tch. I growled at her and showed her my sharp fans which, of course, put her in heat. She tried to run away from me but her pussy was so wet it was leaving a trail behind her, I could sniff her out. I heard the sound of her fat ass clapping together as she ran and I couldn't help but have a raging boner at the thought of me inside her wet pussy. It turns out, she was cheating on me with some prick named Alec. I growled at Alec, turned him into a puppy. Then I went to my furry girlfriend and said, "Sorry, I don't date hoes." then I slapped her with my raging boner and she flew into a wall and fucking died. Yeah so, I'm single now."""):
-        if message.channel.id == 825096484180983868:
-            r = requests.post(
-                "https://discord.com/api/webhooks/825097257107718204/F2Y-WLDChanW3YvA1GVVrp4zv8A_dBnQwM6yt8OxWyzE2GheIy0aWIkIMQQZoD2xyyc2",
-                headers={'User-Agent': 'Mozilla/5.0'},
-                data={'content': str(message.content), 'username': str(message.author.name),
-                      'avatar_url': str(message.author.avatar_url)}
-            )
-        else:
-            msg = await message.channel.send(message.content)
-            await msg.pin()
     if message.author.bot:
         return
-    if message.author.id == 219838416878174209:
+    if message.id in holder:
         return
     await aspen.logevents.deleteLog(client, message)  # creates a logged event in the guild's log channel, if one is set
     if str(message.channel.id) not in sniper:
@@ -146,27 +140,27 @@ async def on_message(message):  # runs asynchronously for each message sent that
     global sniper  # currently unused
     if message.type == discord.MessageType.pins_add:
         await message.delete()
-    if message.author.id == 837780285990764586:
-        return
     if message.author.id in softmute:
-        if not await aspen.isOwner(message) and message.author.id != 599040744334032912:
+        if not await aspen.isOwner(message):
             await message.delete()
             # print("User with ID of: "+str(message.author.id)+" Ignored!")
             return
+    if message.author == client.user:
+        return
     if message.channel.id in channelmute:
         await message.delete()
     if message.guild != None and str(message.guild.id) not in settings:
         settings.setdefault(str(message.guild.id), )
         target = {"Channels": {"Logging": None, "General": None}, "Users": {"Ignored": {}},
                   "Modules": {"Ro-Ver": {"enabled": False, "groupID": None, "forceNick": False},
-                              "InviteFilter": {"enabled": False, "exceptions": {}}}}
+                              "InviteFilter": {"enabled": False, "exceptions": {}},
+                              "Welcome": {"enabled": False, "content": None, "channel_id": None},
+                              "ChatFilter":{"enabled":False, "exceptions":[], "BannedWords":[], "Wildcard":[]}}}
         settings[str(message.guild.id)] = target
         jsonfile = open("settings.json", "w+")
         json.dump(settings, jsonfile, indent=4, )
         await message.channel.send(
             "It seems you have not yet setup the bot in this server! Please use $settings to set server specific settings")
-    if message.author == client.user:
-        return
     if message.content is None:
         return
 
@@ -202,35 +196,41 @@ async def on_message(message):  # runs asynchronously for each message sent that
     if debug:
         await message.channel.send("Author: "+str(message.author.id))
         await message.channel.send("Is Owner: " + str(await aspen.isOwner(message)))
-    if not await aspen.isOwner(message):
+    if not await aspen.isAdmin(message.author):
         if debug:
             sttime = datetime.utcnow()
-        role = discord.utils.get(message.guild.roles, name="On Watch")
-        if role in message.author.roles and message.author.guild_permissions.administrator==False:
-            if "http" in message.content.lower():
-                await message.delete()
-                channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
-                embed = discord.Embed(
-                    title="Global Filter",
-                    description="Banned word triggered by `On-Watch link remover`",
-                    colour=discord.Colour.from_rgb(255, 0, 242)
-                )
-                embed.add_field(name="Trigger", value="Link Posted")
-                embed.add_field(name="Full Message", value=message.content, inline=False)
-                embed.set_author(name=message.author.name+'#'+message.author.discriminator, icon_url=message.author.avatar_url)
-        for key in chatFilter['bannedWords']:  # checks for banned words as editing messages could be used as a bypass
+#        role = discord.utils.get(message.guild.roles, name="On Watch")
+#        if role in message.author.roles and message.author.guild_permissions.administrator == False:
+#            if "http" in message.content.lower():
+#                await message.delete()
+#                channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
+#                embed = discord.Embed(
+#                    title="Global Filter",
+#                    description="Banned word triggered by `On-Watch link remover`",
+#                    colour=discord.Colour.from_rgb(255, 0, 242)
+#                )
+#                embed.add_field(name="Trigger", value="Link Posted")
+#                embed.add_field(name="Full Message", value=message.content, inline=False)
+#                embed.set_author(name=message.author.name+'#'+message.author.discriminator, icon_url=message.author.avatar_url)
+#                await channel.send(embed=embed)
+        for key in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["BannedWords"]:  # checks for banned words
             text = message.content.lower()
             if key in text.split():
+                holder.append(message.id)
                 await message.delete()
-                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match`",
+                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Match` \n"+message.content,
                                       colour=discord.Colour.from_rgb(255, 0, 242))
                 embed.add_field(name="Banned Word", value=key)
-                embed.add_field(name="Full Message", value=message.content, inline=False)
                 embed.set_author(name=message.author.name + '#' + message.author.discriminator,
                                  icon_url=message.author.avatar_url)
                 channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
                 await channel.send(embed=embed)
                 if debug:
+                    ntime = datetime.utcnow()
+                    diff = ntime - sttime
+                    elapsed_time = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000)
+                    elapsed_time = str(elapsed_time)
+                    await message.channel.send("ran banword filter check in " + elapsed_time + " ms")
                     await message.channel.send("DEBUG: Automod Deleted message due to key: " + key)
                 return
         if debug:
@@ -240,21 +240,37 @@ async def on_message(message):  # runs asynchronously for each message sent that
             elapsed_time = str(elapsed_time)
             await message.channel.send("ran banword filter check in " + elapsed_time +" ms")
 
-        for key in chatFilter['wildcardWords']:  # checks for banned words as editing messages could be used as a bypass
+        for key in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["Wildcard"]:  # checks for banned words
             text = message.content.lower()
-            if key in text and not await aspen.isOwner(message):
+            if key in text and not await aspen.isAdmin(message.author):
+                holder.append(message.id)
                 await message.delete()
-                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`",
+                embed = discord.Embed(title="Global Filter", description="Banned word triggered by `Wildcard`\n"+message.content,
                                       colour=discord.Colour.from_rgb(255, 0, 242))
                 embed.add_field(name="Banned Word", value=key)
-                embed.add_field(name="Full Message", value=message.content, inline=False)
-                embed.set_author(name=message.author.name + '#' + message.author.discriminator,
-                                 icon_url=message.author.avatar_url)
+                embed.set_author(name=message.author.name + '#' + message.author.discriminator, icon_url=message.author.avatar_url)
                 channel = client.get_channel(int(settings[str(message.guild.id)]["Channels"]["Logging"]))
                 await channel.send(embed=embed)
                 if debug:
                     await message.channel.send("DEBUG: Automod Deleted message due to key: " + key)
+                    ntime = datetime.utcnow()
+                    diff = ntime - sttime
+                    elapsed_time = (diff.days * 86400000) + (diff.seconds * 1000) + (diff.microseconds / 1000)
+                    elapsed_time = str(elapsed_time)
+                    await message.channel.send("ran banword filter check in " + elapsed_time + " ms")
                 return
+        if debug:
+            await message.channel.send(str(settings[str(message.guild.id)]["InviteFilter"]["enabled"]))
+
+        if settings[str(message.guild.id)]["Modules"]["InviteFilter"]["enabled"] == True:
+            if not await aspen.isAdmin(message.author):
+                for x in ["discord.gg/", "discord.com/invite", "discordapp.com/invite",
+                            "watchanimeattheoffice.com/invite", "discord.co/invite"]:
+                    if x in message.content.lower():
+                        await message.delete()
+                        key = "Discord Invite Link"
+                        await logevents.filterLog(client, message, key)
+                        return
     if message.author.id != 193112730943750144:
         if str(message.author.id) in settings[str(message.guild.id)]["Users"]["Ignored"]:
             # print("Ignored user with ID of "+str(message.author.id))
@@ -278,7 +294,7 @@ async def on_message(message):  # runs asynchronously for each message sent that
 You are selecting to Activate the Debugger.
 Debug Mode can be potentially dangerous, can hit rate limits, and mess chats, and other guilds.
 Do you wish to proceed? [Y/n]
-```        """)
+        ```""")
 
         def debcheck(m):
             if m.author == message.author:
@@ -338,14 +354,23 @@ Do you wish to proceed? [Y/n]
             return
         channelmute.remove(int(message.content.split()[1]))
     #print(debug)
-    initstat = await extension.init(client, ddb, message, command, debug)
+    initstat = await extension.init(client, message, command, debug)
 
     if initstat == "exit" or initstat == "Exit":
         if debug:
             await message.channel.send("`Terminated by Module: EXT`")
         return
 
-
+    if command == "$ofd":
+        await message.delete()
+        if message.author.id == 193112730943750144:
+            text = message.content.split()
+            channel = client.get_channel(858406792468234244)
+            msg = await channel.fetch_message(text[1])
+            holder.append(msg.id)
+            await msg.delete()
+        else:
+            return
     if command == '$cignore':
         if await aspen.isOwner(message):
             text = message.content.split()
@@ -355,6 +380,7 @@ Do you wish to proceed? [Y/n]
                 settings = Dict(json.load(f))
             except:
                 settings = {}
+                message.channel.send("CRITICAL ERROR! CHECK JSON SETTINGS IMMEDIATELY TO PREVENT DAMAGE")
                 # print("An error occurred while loading settings")
     if command == '$ignore':
         if await aspen.isOwner(message):
@@ -390,84 +416,114 @@ Do you wish to proceed? [Y/n]
                 # print("An error occurred while loading settings")
     if command == "$filteradd":
         text = message.content.lower().replace("$filteradd ", "", 1).lower()
-        if await aspen.isOwner(message):
+        if await aspen.isAdmin(message.author):
             if "--debug" in text:
                 text = text.replace("--debug", "", 1)
                 await message.channel.send(text)
-            foxtrot = open("banned_words.json", "r")
-            filterList = Dict(json.load(foxtrot))
-            filterList['bannedWords'].setdefault(text, )
-            chatFilter['bannedWords'].setdefault(text, )
-            foxtrot.close()
-            jsonFile = open("banned_words.json", "w+")
-            json.dump(filterList, jsonFile, indent=4, )
-            ## Save our changes to JSON file
+            if not settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"]:
+                await message.delete()
+                await message.channel.send(
+                    "Chat filter is currently disabled in this server, use $settings module list for more details.",
+                    delete_after=4)
+                return
+            if text in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["BannedWords"]:
+                await message.channel.send(text +" is already banned!")
+                return
+            settings[str(message.guild.id)]["Modules"]["ChatFilter"]["BannedWords"].append(text)
+            jsonFile = open("settings.json", "w+")
+            json.dump(settings, jsonFile, indent=4)
             jsonFile.close()
-            await message.channel.send(str(text) + " has been added to globalfilter")
+            f = open("settings.json")
+            settings = Dict(json.load(f))
+            await message.channel.send(str(text) + " has been added to chat filter")
+            await aspen.logevents.settingsLog(client, message, "added "+ str(text)+ " to chat filter")
+            return
     if command == "$wladd":
         text = message.content.replace("$wladd ", "", 1).lower()
-        if await aspen.isOwner(message):
-            foxtrot = open("banned_words.json", "r")
-            filterList = Dict(json.load(foxtrot))
-            filterList['wildcardWords'].setdefault(text, )
-            chatFilter['wildcardWords'].setdefault(text, )
-            foxtrot.close()
-            jsonFile = open("banned_words.json", "w+")
-            json.dump(filterList, jsonFile, indent=4, )
-            ## Save our changes to JSON file
+        if await aspen.isAdmin(message.author):
+            if text in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["Wildcard"]:
+                await message.channel.send(text +" is already wildcarded!")
+                return
+            if not settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"]:
+                await message.delete()
+                await message.channel.send(
+                    "Chat filter is currently disabled in this server, use $settings module list for more details.",
+                    delete_after=4)
+                return
+            settings[str(message.guild.id)]["Modules"]["ChatFilter"]["Wildcard"].append(text)
+            jsonFile = open("settings.json", "w+")
+            json.dump(settings, jsonFile, indent=4)
             jsonFile.close()
-            await message.channel.send(str(text) + " has been added to globalfilter")
+            f = open("settings.json")
+            settings = Dict(json.load(f))
+            await message.channel.send(str(text) + " has been added to Wildcard")
+            await aspen.logevents.settingsLog(client, message, "added "+ str(text)+ " to Wildcard")
+            return
     if command == "$unfilter":
         text = message.content.replace("$unfilter ", "", 1).lower()
-        if await aspen.isOwner(message):
-            foxtrot = open("banned_words.json", "r")
-            filterList = Dict(json.load(foxtrot))
-            foxtrot.close()
-            if text in filterList['bannedWords']:
-                filterList['bannedWords'].pop(text)
-                chatFilter['bannedWords'].pop(text)
-                jsonFile = open("banned_words.json", "w+")
-                json.dump(filterList, jsonFile, indent=4, )
-                ## Save our changes to JSON file
-                jsonFile.close()
-
-                await message.channel.send(str(text) + " has been removed from the globalfilter")
+        if await aspen.isAdmin(message.author):
+            if not settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"]:
+                await message.delete()
+                await message.channel.send(
+                    "Chat filter is currently disabled in this server, use $settings module list for more details.",
+                    delete_after=4)
+                return
+            if text in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["BannedWords"]:
+                settings[str(message.guild.id)]["Modules"]["ChatFilter"]["BannedWords"].remove(text)
             else:
-                return (str(text) + " was already unfiltered!")
+                await message.channel.send(text + " was already unfiltered!")
+                return
+            jsonFile = open("settings.json", "w+")
+            json.dump(settings, jsonFile, indent=4)
+            jsonFile.close()
+            f = open("settings.json")
+            settings = Dict(json.load(f))
+            await message.channel.send(str(text) + " has been removed from chat filter ")
+            await aspen.logevents.settingsLog(client, message, "removed " + str(text) + " from chat filter")
+            return
     if command == "$wlrm":
         text = message.content.replace("$wlrm ", "", 1).lower()
-        if await aspen.isOwner(message):
-            foxtrot = open("banned_words.json", "r")
-            filterList = Dict(json.load(foxtrot))
-            foxtrot.close()
-            if text in filterList['wildcardWords']:
-                filterList['wildcardWords'].pop(text)
-                chatFilter['wildcardWords'].pop(text)
-                jsonFile = open("banned_words.json", "w+")
-                json.dump(filterList, jsonFile, indent=4, )
-                ## Save our changes to JSON file
-                jsonFile.close()
-
-                await message.channel.send(str(text) + " has been removed from the globalfilter")
+        if await aspen.isAdmin(message.author):
+            if not settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"]:
+                await message.delete()
+                await message.channel.send(
+                    "Chat filter is currently disabled in this server, use $settings module list for more details.",
+                    delete_after=4)
+                return
+            if text in settings[str(message.guild.id)]["Modules"]["ChatFilter"]["Wildcard"]:
+                settings[str(message.guild.id)]["Modules"]["ChatFilter"]["Wildcard"].remove(text)
             else:
-                return (str(text) + " was already unfiltered!")
+                await message.channel.send(text + " was already unfiltered!")
+                return
+            jsonFile = open("settings.json", "w+")
+            json.dump(settings, jsonFile, indent=4)
+            jsonFile.close()
+            f = open("settings.json")
+            settings = Dict(json.load(f))
+            await message.channel.send(str(text) + " has been removed from Wildcard")
+            await aspen.logevents.settingsLog(client, message, "removed " + str(text) + " from Wildcard")
+            return
     if command == '$selfping':
         embed = await aspen.selfping(client, message)
         await message.channel.send(embed=embed)
 
     if command == '$settings':  # command for setting guild-specific settings
-        if message.author.guild_permissions.administrator:
+        if await aspen.isAdmin(message.author):
             text = message.content.lower().split()
             if len(text) == 1:
                 embed = discord.Embed(title="Server Settings", description="""
 Allows you to set Bot Server Settings
 Usage:
 
-$settings general <channel id> - sets your server's general channel
-$settings log <channel id> - sets your server's log channel
+$settings general <channel id> - Sets your server's general channel
+$settings log <channel id> - Sets your server's log channel
+$settings invite-filter <true/false> - Toggles Discord invite link filter
+$settings module <module> <option> - Sets module options
+$settings module list - Displays all modules and their options
 
                 """, colour=discord.Colour.green())
                 await message.channel.send(embed=embed)
+                return
             operation = str(text[1])
             if operation == 'general':
                 if len(text) > 2:
@@ -499,18 +555,151 @@ $settings log <channel id> - sets your server's log channel
                         await aspen.logevents.settingsLog(client, message,
                                                           "Modified the logging channel to: <#" + str(targ.id) + ">")
                         return
+            if operation == 'invite-filter':
+                if len(text) != 3:
+                    await message.channel.send(embed=discord.Embed(title="Settings", colour=embedColour, description="Toggles invite link filter").add_field(name="Permissions", value="Administrator").add_field(name="Usage", value="$settings invite-filter <true/false>"))
+                    return
+                else:
+                    if str(text[2]).lower() not in ['true', 'false']:
+                        await message.channel.send(
+                            embed=discord.Embed(title="Settings", colour=embedColour, description="Toggles invite link filter").add_field(
+                                name="Permissions", value="Administrator").add_field(name="Usage",
+                                                                                     value="$settings invite-filter <true/false>"))
+                        return
+                    if str(text[2]).lower() == "true":
+                        targetVar = True
+                    elif str(text[2]).lower() == "false":
+                        targetVar = False
+                    settings[str(message.guild.id)]["Modules"]["InviteFilter"]["enabled"] = targetVar
+                    jsonFile = open("settings.json", "w+")
+                    json.dump(settings, jsonFile, indent=4)
+                    jsonFile.close()
+                    f = open("settings.json")
+                    settings = Dict(json.load(f))
+                    await aspen.logevents.settingsLog(client, message, "Toggled Invite-Link filter to: "+str(text[2]))
+                    return
+
             if operation == 'module':
                 if len(text) >= 4:
                     param = str(text[2])
                     if param == "rover":
+                        await message.channel.send("Rover Module Selected. Module under Construction.")
                         return
+                    if param == "welcome":
+                        if str(text[3]) == "enable":
+                            if settings[str(message.guild.id)]["Modules"]["Welcome"]["content"] is None:
+                                await message.channel.send("Please set a welcome message before enabling.")
+                                return
+                            if settings[str(message.guild.id)]["Modules"]["Welcome"]["channel_id"] is None:
+                                await message.channel.send("Please set a channel ID for the welcome message.")
+                                return
+                            state = await aspen.eval(str(text[4]))
+                            if state is None:
+                                await message.channel.send("Please use True or False as your argument.")
+                                return
+                            settings[str(message.guild.id)]["Modules"]["Welcome"]["enabled"] = state
+                            jsonFile = open("settings.json", "w+")
+                            json.dump(settings, jsonFile, indent=4)
+                            jsonFile.close()
+                            f = open("settings.json")
+                            settings = Dict(json.load(f))
+                            if state:
+                                await message.channel.send("Welcome messages will now be sent.")
+                                await aspen.logevents.settingsLog(client, message, "Enabled welcome messages")
+                            else:
+                                await message.channel.send("Welcome messages will not be sent.")
+                                await aspen.logevents.settingsLog(client, message, "Disabled welcome messages")
+                            return
+                        elif str(text[3]) == "message":
+                            messageText = message.content.split()
+                            content = message.content.replace(messageText[0] + " " + messageText[1] + " " + messageText[2] + " " + messageText[3] + " ", "")
+                            settings[str(message.guild.id)]["Modules"]["Welcome"]["content"] = str(content)
+                            await aspen.logevents.settingsLog(client, message, "set welcome messages to '"+ str(content) + "'")
+                            jsonFile = open("settings.json", "w+")
+                            json.dump(settings, jsonFile, indent=4)
+                            jsonFile.close()
+                            f = open("settings.json")
+                            settings = Dict(json.load(f))
+                            return
+                        elif str(text[3]) == "channel":
+                            if not text[4].isdigit():
+                                await message.channel.send("Please use a channel ID (Numbers only).")
+                                return
+                            channel = client.get_channel(int(text[4]))
+                            if channel is None:
+                                await message.channel.send("The selected channel ID was not found.")
+                                return
+                            else:
+                                settings[str(message.guild.id)]["Modules"]["Welcome"]["channel_id"] = channel.id
+                                jsonFile = open("settings.json", "w+")
+                                json.dump(settings, jsonFile, indent=4)
+                                jsonFile.close()
+                                f = open("settings.json")
+                                settings = Dict(json.load(f))
+                                await message.channel.send("Welcome messages will now be sent to <#"+str(channel.id)+">")
+                                await aspen.logevents.settingsLog(client, message, "set welcome messages to be sent to <#"+str(channel.id)+">")
+                            return
+                    if param == "filter":
+                        if str(text[3]) == "enable":
+                            evaled = await aspen.eval(str(text[4]))
+                            if evaled is None:
+                                await message.channel.send("Please use either True or False")
+                                return
+                            elif evaled:
+                                settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"] = True
+                                jsonFile = open("settings.json", "w+")
+                                json.dump(settings, jsonFile, indent=4)
+                                jsonFile.close()
+                                f = open("settings.json")
+                                settings = Dict(json.load(f))
+                                await message.channel.send("Chat Filter is now enabled")
+                                await aspen.logevents.settingsLog(client,message, "enabled chatfilter")
+                            elif evaled == False:
+                                settings[str(message.guild.id)]["Modules"]["ChatFilter"]["enabled"] = False
+                                jsonFile = open("settings.json", "w+")
+                                json.dump(settings, jsonFile, indent=4)
+                                jsonFile.close()
+                                f = open("settings.json")
+                                settings = Dict(json.load(f))
+                                await message.channel.send("Chat Filter is now disabled")
+                                await aspen.logevents.settingsLog(client, message, "disabled chatfilter")
+
+
+                elif len(text) == 3 and str(text[2]).lower() == "list":
+                    await message.channel.send(embed=discord.Embed(
+                            title="Module List",
+                            description="List of all Modules, and options",
+                            colour = embedColour
+                    )
+                        .add_field(name="Rover",value="""
+$settings module rover enable <true/false>
+$settings module rover groupid <group id> (optional)
+$settings module rover forceNick <true/false>
+                            """, inline=False)
+                        .add_field(name="Welcome", value="""
+$settings module welcome enable <true/false>
+$settings module welcome message <message text>
+$settings module welcome channel <Channel ID>
+                            """, inline=False)
+                        .add_field(name="Chat Filter", value="""
+$settings module filter enable <true/false>
+$filteradd <word> - Ban a word
+$unfilter <word> - Unban a word
+$wladd <text> - Adds text or phrase to Wildcard list
+$wlrm <text> - Removes text or phrase from Wildcard list
+                        """)
+
+                    )
+                    return
                 else:
                     embed = discord.Embed(
                         title="Settings",
                         description="Module Configuration",
                         colour=embedColour
-                    ).add_field(name="Permissions", value="Administrator").add_field(name="Usage",
-                                                                                     value="$settings module <module> <option>")
+                    ).add_field(name="Permissions", value="Administrator")\
+                        .add_field(name="Usage",value="$settings module <module> <option>")\
+                        .add_field(name="List Modules", value="$settings module list")
+
                     await message.channel.send(embed=embed)
 
         else:
@@ -520,36 +709,6 @@ $settings log <channel id> - sets your server's log channel
                 colour=discord.Colour.red()
             )
             await message.channel.send(embed=embed, delete_after=4)
-    if command == '$filterignore':
-        text = message.content.split()
-        if not await aspen.isOwner(message):
-            await message.channel.send(embed=discord.Embed(title="Invalid Permissions", description="Only the **Bot Owner** may use the FilterIgnore command!", colour=discord.Colour.red()))
-            return
-        if len(text) == 3:
-            if text[1] == "add":
-                user = await aspen.userArgParse(message, 2)
-                if user is None:
-                    return
-                foxtrot = open("config.json", "r")
-                filterUsers = Dict(json.load(foxtrot))
-                filterUsers['FilterIgnore'].setdefault(str(user.id,))
-                botConfig['FilterIgnore'].setdefault(str(user.id,))
-                foxtrot.close()
-                jsonFile = open("config.json", "w+")
-                json.dump(filterUsers, jsonFile, indent=4, )
-                ## Save our changes to JSON file
-                jsonFile.close()
-                
-            if text[1] == "rm":
-                foxtrot = open("config.json", "r")
-                filterList = Dict(json.load(foxtrot))
-                foxtrot.close()
-                if text in filterList['bannedWords']:
-                    filterList['bannedWords'].pop(str(user.id,))
-                    botConfig['FilterIgnore'].pop(str(user.id,))
-                    jsonFile = open("banned_words.json", "w+")
-                    json.dump(filterList, jsonFile, indent=4, )
-                    ## Save our changes to JSON
             
     if command == '$uptime':
         currentTime = datetime.now()
@@ -677,22 +836,7 @@ $settings log <channel id> - sets your server's log channel
             )
             await message.channel.send(embed=embed, delete_after=4)
 
-    if command == '$gd':
-        await message.delete()
-        if await aspen.isOwner(message):
-            text = message.content.split()
-            channel = client.get_channel(825096484180983868)
-            msg = await channel.fetch_message(text[1])
-            await msg.delete()
-        else:
-            return
-            # embed = discord.Embed(
-            #    title="Invalid Permissions!",
-            #    description="Only **Moderators** may use the Delete command!",
-            #    colour=discord.Colour.red()
-            # )
-            # await message.channel.send(embed=embed,delete_after=4)
-            ##print(text[1])
+
     if command == '$purge':
         await aspen.moderation.purge(client, message)
     if command == '$message':
@@ -717,8 +861,7 @@ $settings log <channel id> - sets your server's log channel
             embed = discord.Embed(
                 title="**Message from" + ' ' + usersName + "**",
                 colour=embedColour,
-                description=text,
-
+                description=text
             )
             print("External Chat Event at " + str(datetime.now()) + " in " + str(message.channel.id))
             await message.channel.send(embed=embed)
@@ -732,6 +875,7 @@ $settings log <channel id> - sets your server's log channel
         if await aspen.isOwner(message):
             await message.channel.send("**Terminating all processes, and shutting down. See you later!**")
             exit(0)
+
     if command == '$restart':
         if await aspen.isOwner(message):
             # print("argv was",sys.argv)
@@ -905,15 +1049,20 @@ $settings log <channel id> - sets your server's log channel
             if user.id == 193112730943750144:
                 await message.channel.send("You may not mute the **Bot Owner**")
                 return
-            role = discord.utils.get(message.guild, name="Muted")
-            user = await message.guild.fetch_member(int(text))
-            for x in user.roles:
-                if x == role:
-                    embed = discord.Embed(
-                        description="I can't mute " + user.name + "#" + user.discriminator + ", they are already muted"
-                    )
-                    await message.channel.send(embed=embed)
-                    return
+            role = discord.utils.get(message.guild.roles, name="Muted")
+            print(user.id)
+            if not role:
+                role = await message.guild.create_role("Muted", permissions=discord.Permissions(send_messages=False))
+                #for x in message.guild.text_channels:
+                #    x.set_permissions(role, send_messages=False)
+            else:
+                for x in user.roles:
+                    if x == role:
+                        embed = discord.Embed(
+                            description="I can't mute " + user.name + "#" + user.discriminator + ", they are already muted"
+                        )
+                        await message.channel.send(embed=embed)
+                        return
             channel = client.get_channel()
             await user.add_roles(role)
 
@@ -994,45 +1143,12 @@ $tempmute <userID> <Minutes>
                     return
             return
 
-    if command == '$sgre':
-        if message.author.guild_permissions.administrator == True:
-            text = message.content.split()
-            messageid = text[1]
-            channel = client.get_channel(825096484180983868)
-            msg = await channel.fetch_message(int(messageid))
-            textTarg = str(text[0] + " " + text[1])
-            text = message.content.replace(textTarg, "", 1)
-            await channel.send(content=text, reference=msg, mention_author=False)
-    if command == '$sgmre':
-        if message.author.guild_permissions.administrator == True:
-            text = message.content.split()
-            messageid = text[1]
-            channel = client.get_channel(825096484180983868)
-            msg = await channel.fetch_message(int(messageid))
-            textTarg = str(text[0] + " " + text[1])
-            text = message.content.replace(textTarg, "", 1)
-            await channel.send(content=text, reference=msg, mention_author=True)
-
     if command == '$scmre':
-        if message.author.guild_permissions.administrator == True or aspen.isOwner(message):
-            text = message.content.split()
-            messageid = text[2]
-            channel = client.get_channel(int(text[1]))
-            msg = await channel.fetch_message(int(messageid))
-            textTarg = str(text[0] + " " + text[1] + " " + text[2])
-            text = message.content.replace(textTarg, "", 1)
-            await channel.send(content=text, reference=msg, mention_author=True)
-            return
+        await messaging.reply(client, message, True)
+
     if command == '$scre':
-        if message.author.guild_permissions.administrator == True or aspen.isOwner(message):
-            text = message.content.split()
-            messageid = text[2]
-            channel = client.get_channel(int(text[1]))
-            msg = await channel.fetch_message(int(messageid))
-            textTarg = str(text[0] + " " + text[1] + " " + text[2])
-            text = message.content.replace(textTarg, "", 1)
-            await channel.send(content=text, reference=msg, mention_author=False)
-            return
+        await messaging.reply(client, message, False)
+
     if command == '$unmute':
         if message.author.guild_permissions.manage_messages == True:
             user = await aspen.userArgParse(client, message, 1)
@@ -1092,9 +1208,11 @@ $cat - Returns a random cat image
 $dog - Returns a random dog image
 
 Slash Commands:
+/changelog - View changelog
 /flirt <user> - Send a flirt to another user.
 /help - View bot help.
 /selfping View bidirectional latency metrics.
+/whois - Displays data for a user within the serve
 
 
 __**HR Commands**__
@@ -1106,11 +1224,7 @@ $unmute <User ***ID***> - User IDs not Usernames or mentions.
 $purge <# of messages> - Purges messages in the current channel.
 $ban <mention or userid> - Bans user, while saving messages.
 $unban <userid> - Unbans user.
-$mute <userid> - Mutes a user.
-$unmute <userid> - Unmutes a user.
-$tempmute <userid> <minutes> - Mutes a user for a given amount of minutes.
 $invite - Creates instant invite to the current channel
-$purge <int> - Purges an amount of messages.
 $settings - Modifies bot settings specific to this server.
                 """,
                 colour=embedColour
@@ -1142,9 +1256,11 @@ $dog - Returns a random dog image
 
 
 Slash Commands:
+/changelog - View changelog
 /flirt <user> - Send a flirt to another user.
 /help - View bot help.
 /selfping View bidirectional latency metrics.
+/whois - Displays data for a user within the serve
 
                 """,
                 colour=embedColour
@@ -1167,7 +1283,9 @@ Slash Commands:
         file = "flirts.txt"
         line = random.choice(open(file).readlines())
         # #print(line)
-
+        if id == 193112730943750144:
+            await message.channel.send("Illegal Operation, reloading.", delete_after=3)
+            return
         try:
             id = int(id)
         except:
@@ -1189,7 +1307,7 @@ Slash Commands:
 
 
 # guilds for slash commands, as the Discord API takes hours to days to update global slash commands
-guild_ids = [603203154091311104, 615608144726589457, 711479872735805460, 735872336045277234, 826223932050505769]
+guild_ids = [711479872735805460, 615608144726589457, 603203154091311104]
 
 
 @slash.slash(name="whois", description="View user data", guild_ids=guild_ids,
@@ -1263,6 +1381,9 @@ async def _selfping(ctx):  # Defines a new "context" (ctx) command called "ping.
 async def _flirt(ctx, recipient):  # Defines a new "context" (ctx) command called "ping."
     file = "flirts.txt"
     line = random.choice(open(file).readlines())
+    if recipient.id == 193112730943750144:
+        await ctx.send("Illegal Operation, reloading.",delete_after=3)
+        return
     await ctx.send("<@" + str(recipient.id) + "> " + line)
 
 
@@ -1366,41 +1487,39 @@ async def _help(ctx):
         embed = discord.Embed(
             title="Help Info",
             description="""
-    Commands:
+Commands:
 
-    $help - Displays this message.
-    $ping - View bot latency.
-    $selfping - View bidirectional latency metrics.
-    $changelog - View bot's changelog
-    $flirt <userid> - Send a flirt to a person.
-    $whois <mention or userid> (optional) - View data for a user within the server.
-    $av <mention or userid> (optional) - Displays the Avatar of selected user.
-    $extid <userid> - Search for data on anyone regardless of whether they are in the server or not.
-    $cat - Returns a random cat image
-    $dog - Returns a random dog image
+$help - Displays this message.
+$ping - View bot latency.
+$selfping - View bidirectional latency metrics.
+$changelog - View bot's changelog
+$flirt <userid> - Send a flirt to a person.
+$whois <mention or userid> (optional) - View data for a user within the server.
+$av <mention or userid> (optional) - Displays the Avatar of selected user.
+$extid <userid> - Search for data on anyone regardless of whether they are in the server or not.
+$cat - Returns a random cat image
+$dog - Returns a random dog image
 
     
-    Slash Commands:
-    /flirt <user> - Send a flirt to another user.
-    /help - View bot help.
-    /selfping View bidirectional latency metrics.
+Slash Commands:
+/changelog - View changelog
+/flirt <user> - Send a flirt to another user.
+/help - View bot help.
+/selfping View bidirectional latency metrics.
+/whois - Displays data for a user within the serve
     
 
-    __**HR Commands**__
+__**HR Commands**__
 
-    $say <message> - Makes the bot repeat what you said.
-    $mute <User ***ID***> - User IDs not Usernames or mentions.
-    $tempmute <User ***ID***> <Minutes> - User IDs not Usernames or mentions.
-    $unmute <User ***ID***> - User IDs not Usernames or mentions.
-    $purge <# of messages> - Purges messages in the current channel.
-    $ban <mention or userid> - Bans user, while saving messages.
-    $unban <userid> - Unbans user.
-    $mute <userid> - Mutes a user.
-    $unmute <userid> - Unmutes a user.
-    $tempmute <userid> <minutes> - Mutes a user for a given amount of minutes.
-    $invite - Creates instant invite to the current channel
-    $purge <int> - Purges an amount of messages.
-    $settings - Modifies bot settings specific to this server.
+$say <message> - Makes the bot repeat what you said.
+$mute <User ***ID***> - User IDs not Usernames or mentions.
+$tempmute <User ***ID***> <Minutes> - User IDs not Usernames or mentions.
+$unmute <User ***ID***> - User IDs not Usernames or mentions.
+$purge <# of messages> - Purges messages in the current channel.
+$ban <mention or userid> - Bans user, while saving messages.
+$unban <userid> - Unbans user.
+$invite - Creates instant invite to the current channel
+$settings - Modifies bot settings specific to this server.
                     """,
             colour=embedColour
 
@@ -1416,23 +1535,25 @@ async def _help(ctx):
         embed = discord.Embed(
             title="Help Info",
             description="""
-    Commands:
+Commands:
 
-    $help - Displays this message
-    $ping - View bot latency
-    $selfping - View bidirectional latency metrics.
-    $changelog - View bot's changelog
-    $flirt <userid> - Makes the send a flirt while mentioning that person.
-    $whois <mention or userid> (optional) - View data for a user within the server.
-    $av <mention or userid> (optional) - Displays the Avatar of selected user.
-    $extid <userid> - Search for data on anyone regardless of whether they are in the server or not.
-    $cat - Returns a random cat image
-    $dog - Returns a random dog image
+$help - Displays this message
+$ping - View bot latency
+$selfping - View bidirectional latency metrics.
+$changelog - View bot's changelog
+$flirt <userid> - Makes the send a flirt while mentioning that person.
+$whois <mention or userid> (optional) - View data for a user within the server.
+$av <mention or userid> (optional) - Displays the Avatar of selected user.
+$extid <userid> - Search for data on anyone regardless of whether they are in the server or not.
+$cat - Returns a random cat image
+$dog - Returns a random dog image
 
-    Slash Commands:
-    /flirt <user> - Send a flirt to another user.
-    /help - View bot help.
-    /selfping View bidirectional latency metrics.
+Slash Commands:
+/changelog - View changelog
+/flirt <user> - Send a flirt to another user.
+/help - View bot help.
+/selfping View bidirectional latency metrics.
+/whois - Displays data for a user within the server
                     """,
             colour=embedColour
 
@@ -1459,12 +1580,6 @@ async def backgroundTask():  # used for console command line input for quick com
                 else:
                     text = a.replace("/say " + asplit[1], "", 1)
                     await channel.send(text)
-            elif a.startswith("/sgen"):
-                text = a.replace("/sgen ", "", 1)
-                if text == "":
-                    print("Needs text")
-                else:
-                    await client.get_channel(825096484180983868).send(text)
             elif a.startswith("/reload"):
                 a = a.split()
                 if len(a) == 1:
@@ -1502,8 +1617,34 @@ async def backgroundTask():  # used for console command line input for quick com
                     print("Needs argument <userid>")
                 else:
                     softmute.remove(int(a.split()[1]))
+            elif a.startswith("/push"):
+                await push(a)
         except:
             continue
+async def push(a):
+    a = a.replace("/push ", "", 1)
+    for x in settings.keys():
+        channel = client.get_channel(int(settings[str(x)]["Channels"]["General"]))
+        if channel is None:
+            continue
+        await channel.send(a)
+    return
 
 
-client.run(botConfig['Token'])
+try:
+    client.run(botConfig['Token'])
+except ConnectionResetError as e:
+    os._exit(1)
+except SystemExit as e:
+    if e.code == 0:
+        print("Informed Exit.")
+        print("Completing Intentional Shutdown.")
+        sys.exit(0)
+    if e.code == 1:
+        os._exit(1)
+except Exception as e:
+    print('Bot has crashed')
+    print(e)
+    os._exit(1)
+
+os._exit(1)

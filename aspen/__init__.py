@@ -5,6 +5,9 @@ from addict import Dict
 import json
 import asyncio
 
+f = open("config.json")
+config = Dict(json.load(f))
+
 def strfdelta(tdelta, fmt):
     d = {"days": tdelta.days}
     d["hours"], rem = divmod(tdelta.seconds, 3600)
@@ -76,15 +79,28 @@ async def isOwner(message):
     f = open("config.json")
     config = Dict(json.load((f)))
     # await message.channel.send(str(list(config["Contributors"].values())))
-    if message.author.id in list(config["Contributors"].values()):
+    if message.author.id in config["Contributors"]:
         if "--debug" in message.content.lower():
             await message.channel.send("IsOwner=True")
         return True
     else:
         return False
 
-async def isAdmin(message):
-    return
+async def eval(str):
+    if str.lower() == "true":
+        return True
+    elif str.lower() == "false":
+        return False
+    else:
+        return None
+
+async def isAdmin(user):
+    if user.guild_permissions.administrator:
+        return True
+    elif user.id in config["Contributors"]:
+        return True
+    else:
+        return False
 
 async def isMod(message):
     return
@@ -101,6 +117,10 @@ async def userArgParse(client, message, selector):
     else:
         try:
             target = int(text[selector])
+            if len(str(target)) > 18 and len(str(target)) < 17:
+                await message.channel.send("Please ensure you used a User ID, or valid user mention.")
+                return None
+
         except:
             await message.channel.send("Please ensure you used a User ID, or valid user mention.")
             return None

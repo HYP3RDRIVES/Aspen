@@ -13,7 +13,7 @@ async def purge(client, message):
             return
         await message.delete()
         await message.channel.purge(limit=int(text[1]))
-        stringy = text+" Messages deleted in <#"+str(message.channel.id)+">"
+        stringy = str(text[1]+" Messages deleted in <#"+str(message.channel.id)+">")
         await logevents.internalEventLog(client, message.guild.id, message.author, "Purge", stringy)
 
 async def delete(client, message):
